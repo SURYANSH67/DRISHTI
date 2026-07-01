@@ -11,8 +11,9 @@ export default function App() {
   const [books, setBooks] = useState<BookOverview[]>([]);
   const [selectedBookId, setSelectedBookId] = useState<string>("");
   const [selectedChapterNum, setSelectedChapterNum] = useState<number | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  // Load authenticated user profile from local cache on mount
+  // Load authenticated user profile and theme settings on mount
   useEffect(() => {
     const cachedUser = localStorage.getItem("drishti_user");
     if (cachedUser) {
@@ -23,6 +24,16 @@ export default function App() {
         localStorage.removeItem("drishti_user");
       }
     }
+
+    const cachedTheme = localStorage.getItem("drishti_theme") as "light" | "dark";
+    if (cachedTheme) {
+      setTheme(cachedTheme);
+      document.documentElement.classList.toggle("dark", cachedTheme === "dark");
+    } else {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setTheme(prefersDark ? "dark" : "light");
+      document.documentElement.classList.toggle("dark", prefersDark);
+    }
   }, []);
 
   // Fetch available books database once logged in
@@ -31,6 +42,13 @@ export default function App() {
       fetchBooks();
     }
   }, [user]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    localStorage.setItem("drishti_theme", newTheme);
+    document.documentElement.classList.toggle("dark", newTheme === "dark");
+  };
 
   const fetchBooks = async () => {
     try {
@@ -60,7 +78,7 @@ export default function App() {
 
   // 1. If not logged in, redirect to authentication (Login / Registration)
   if (!user) {
-    return <AuthView onAuthSuccess={handleAuthSuccess} />;
+    return <AuthView onAuthSuccess={handleAuthSuccess} theme={theme} toggleTheme={toggleTheme} />;
   }
 
   // 2. Render Admin Panel Workspace
@@ -71,6 +89,8 @@ export default function App() {
         books={books}
         fetchBooks={fetchBooks}
         onLogout={handleLogout}
+        theme={theme}
+        toggleTheme={toggleTheme}
       />
     );
   }
@@ -87,6 +107,8 @@ export default function App() {
         setSelectedChapterNum={setSelectedChapterNum}
         fetchBooks={fetchBooks}
         onLogout={handleLogout}
+        theme={theme}
+        toggleTheme={toggleTheme}
       />
     );
   }
@@ -101,6 +123,8 @@ export default function App() {
       selectedChapterNum={selectedChapterNum}
       setSelectedChapterNum={setSelectedChapterNum}
       onLogout={handleLogout}
+      theme={theme}
+      toggleTheme={toggleTheme}
     />
   );
 }

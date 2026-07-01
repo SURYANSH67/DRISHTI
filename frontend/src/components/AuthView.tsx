@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { api } from "../services/api";
-import { Key, Mail, User, GraduationCap, School, Layers, ChevronDown } from "lucide-react";
+import { Key, Mail, User, GraduationCap, School, Layers, ChevronDown, Sun, Moon } from "lucide-react";
 
 interface AuthViewProps {
   onAuthSuccess: (user: any) => void;
+  theme: string;
+  toggleTheme: () => void;
 }
 
-export default function AuthView({ onAuthSuccess }: AuthViewProps) {
+export default function AuthView({ onAuthSuccess, theme, toggleTheme }: AuthViewProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -84,6 +86,16 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-indigo-300/40 blur-[130px] pointer-events-none"></div>
 
       <div className="w-full max-w-md glass-panel p-8 rounded-3xl border border-slate-200/80 shadow-2xl relative z-10 transition-all duration-300">
+        
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          type="button"
+          className="absolute top-4 right-4 p-2 bg-slate-100/50 hover:bg-slate-200/50 border border-slate-250 text-slate-600 dark:text-slate-350 hover:text-purple-650 rounded-xl transition-colors cursor-pointer"
+          title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+        >
+          {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </button>
         
         {/* Title branding header with DRDO logo */}
         <div className="text-center mb-6">

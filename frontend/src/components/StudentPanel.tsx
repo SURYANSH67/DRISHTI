@@ -12,7 +12,9 @@ import {
   LogOut,
   Book,
   Download,
-  Menu
+  Menu,
+  Sun,
+  Moon
 } from "lucide-react";
 import { api } from "../services/api";
 import type { BookOverview, ChatMessage, ContextSource, QuizQuestion } from "../services/api";
@@ -26,6 +28,8 @@ interface StudentPanelProps {
   selectedChapterNum: number | null;
   setSelectedChapterNum: (num: number | null) => void;
   onLogout: () => void;
+  theme: string;
+  toggleTheme: () => void;
 }
 
 type Tab = "dashboard" | "library" | "tutor" | "study-hub" | "quiz" | "grader";
@@ -37,7 +41,9 @@ export default function StudentPanel({
   setSelectedBookId,
   selectedChapterNum,
   setSelectedChapterNum,
-  onLogout
+  onLogout,
+  theme,
+  toggleTheme
 }: StudentPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -364,6 +370,25 @@ export default function StudentPanel({
               )}
             </div>
           )}
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            title={theme === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+            className={`w-full flex items-center justify-center ${sidebarCollapsed ? "p-3" : "gap-2 py-2.5"} mb-2 rounded-xl border border-slate-200 hover:bg-slate-100 hover:text-slate-800 text-slate-500 text-xs font-bold transition-all bg-white cursor-pointer`}
+          >
+            {theme === "light" ? (
+              <>
+                <Moon className="w-4 h-4 shrink-0 text-purple-600" />
+                {!sidebarCollapsed && <span>Dark Mode</span>}
+              </>
+            ) : (
+              <>
+                <Sun className="w-4 h-4 shrink-0 text-amber-500" />
+                {!sidebarCollapsed && <span>Light Mode</span>}
+              </>
+            )}
+          </button>
 
           <button
             onClick={onLogout}
