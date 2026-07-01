@@ -34,31 +34,41 @@ async def generate_resource(request: GenerateRequest):
     
     # Locate chapter details
     chapter = None
-    for idx, ch in enumerate(metadata["chapters"]):
-        if idx + 1 == request.chapter_number:
-            chapter = ch
-            break
-            
-    if not chapter:
-        raise HTTPException(status_code=404, detail=f"Chapter {request.chapter_number} not found.")
+    if request.chapter_number > 0:
+        for idx, ch in enumerate(metadata["chapters"]):
+            if idx + 1 == request.chapter_number:
+                chapter = ch
+                break
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Chapter {request.chapter_number} not found.")
 
-    # Retrieve relevant text chunks for this chapter to feed the generator
-    emb_query = ai_service.get_embedding(f"Chapter overview of {chapter['title']}")
+    # Retrieve relevant text chunks for this chapter/book to feed the generator
+    search_topic = chapter['title'] if chapter else metadata.get("filename", "textbook")
+    emb_query = ai_service.get_embedding(f"Chapter overview of {search_topic}")
+    
+    meta_filter = {"book_id": request.book_id}
+    if request.chapter_number > 0:
+        meta_filter["chapter_number"] = request.chapter_number
+        
     matches = vector_store.search(
         emb_query, 
         k=12, 
-        filter_metadata={"book_id": request.book_id, "chapter_number": request.chapter_number}
+        filter_metadata=meta_filter
     )
     
     context_text = "\n\n".join([m["text"] for m in matches])
 
     # Load and filter specific elements like formulas and images
-    chapter_formulas = [f for f in metadata.get("formulas", []) if f["chapter_number"] == request.chapter_number]
-    chapter_images = [img for img in metadata.get("images", []) if img["chapter_number"] == request.chapter_number]
-    chapter_tables = [tbl for tbl in metadata.get("tables", []) if tbl["chapter_number"] == request.chapter_number]
-
-    prompt = ""
-    title = f"Chapter {request.chapter_number}: {chapter['title']}"
+    if request.chapter_number > 0:
+        chapter_formulas = [f for f in metadata.get("formulas", []) if f["chapter_number"] == request.chapter_number]
+        chapter_images = [img for img in metadata.get("images", []) if img["chapter_number"] == request.chapter_number]
+        chapter_tables = [tbl for tbl in metadata.get("tables", []) if tbl["chapter_number"] == request.chapter_number]
+        title = f"Chapter {request.chapter_number}: {chapter['title']}"
+    else:
+        chapter_formulas = metadata.get("formulas", [])[:15]
+        chapter_images = metadata.get("images", [])[:10]
+        chapter_tables = metadata.get("tables", [])[:10]
+        title = f"Entire Book: {metadata.get('filename')}"
 
     if request.resource_type == "notes":
         title += " - Revision Notes"
@@ -168,27 +178,33 @@ async def generate_quiz(request: QuizGenerateRequest):
     
     # Locate chapter details
     chapter = None
-    for idx, ch in enumerate(metadata["chapters"]):
-        if idx + 1 == request.chapter_number:
-            chapter = ch
-            break
-            
-    if not chapter:
-        raise HTTPException(status_code=404, detail=f"Chapter {request.chapter_number} not found.")
+    if request.chapter_number > 0:
+        for idx, ch in enumerate(metadata["chapters"]):
+            if idx + 1 == request.chapter_number:
+                chapter = ch
+                break
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Chapter {request.chapter_number} not found.")
 
     # Fetch context
-    emb_query = ai_service.get_embedding(f"Key technical concepts, problems and questions in chapter {chapter['title']}")
+    search_topic = chapter['title'] if chapter else metadata.get("filename", "textbook")
+    emb_query = ai_service.get_embedding(f"Key technical concepts, problems and questions in {search_topic}")
+    
+    meta_filter = {"book_id": request.book_id}
+    if request.chapter_number > 0:
+        meta_filter["chapter_number"] = request.chapter_number
+        
     matches = vector_store.search(
         emb_query, 
         k=10, 
-        filter_metadata={"book_id": request.book_id, "chapter_number": request.chapter_number}
+        filter_metadata=meta_filter
     )
     context_text = "\n\n".join([m["text"] for m in matches])
 
     quiz_prompt = f"""
 Create a highly professional quiz based on the textbook chapter context.
 
-Chapter Title: {chapter['title']}
+Chapter/Book Title: {chapter['title'] if chapter else metadata.get('filename')}
 Difficulty Level: {request.difficulty}
 Total Questions: {request.question_count}
 Question Types to Include: {', '.join(request.question_types)}
@@ -270,20 +286,26 @@ async def generate_question_paper(request: QuestionPaperGenerateRequest):
     metadata = load_book_metadata(request.book_id)
     
     chapter = None
-    for idx, ch in enumerate(metadata["chapters"]):
-        if idx + 1 == request.chapter_number:
-            chapter = ch
-            break
-            
-    if not chapter:
-        raise HTTPException(status_code=404, detail=f"Chapter {request.chapter_number} not found.")
+    if request.chapter_number > 0:
+        for idx, ch in enumerate(metadata["chapters"]):
+            if idx + 1 == request.chapter_number:
+                chapter = ch
+                break
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Chapter {request.chapter_number} not found.")
 
     # Search textbook context
-    emb_query = ai_service.get_embedding(f"Exam questions, numericals, conceptual theories, exercises in {chapter['title']}")
+    search_topic = chapter['title'] if chapter else metadata.get("filename", "textbook")
+    emb_query = ai_service.get_embedding(f"Exam questions, numericals, conceptual theories, exercises in {search_topic}")
+    
+    meta_filter = {"book_id": request.book_id}
+    if request.chapter_number > 0:
+        meta_filter["chapter_number"] = request.chapter_number
+        
     matches = vector_store.search(
         emb_query, 
         k=15, 
-        filter_metadata={"book_id": request.book_id, "chapter_number": request.chapter_number}
+        filter_metadata=meta_filter
     )
     context_text = "\n\n".join([m["text"] for m in matches])
 
@@ -303,7 +325,7 @@ async def generate_question_paper(request: QuestionPaperGenerateRequest):
     paper_prompt = f"""
 Create a highly professional academic Question Paper based on the textbook context provided below.
 
-Chapter Title: {chapter['title']}
+Chapter/Book Title: {chapter['title'] if chapter else metadata.get('filename')}
 Exam Type: {request.exam_type}
 Pattern Style: {request.pattern}
 Total Marks: {request.total_marks} Marks
@@ -334,7 +356,7 @@ INSTRUCTIONS:
 Format the header exactly like this:
 # {request.exam_type.upper()} EXAMINATION
 **Subject**: {metadata.get("filename", "Defence Studies")}
-**Chapter**: {chapter['title']}
+**Chapter**: {chapter['title'] if chapter else "Entire Book"}
 **Total Marks**: {request.total_marks} | **Duration**: {request.duration_hours} Hours
 **Difficulty**: {request.difficulty} | **Pattern**: {request.pattern}
 
@@ -348,7 +370,10 @@ Format the header exactly like this:
 
     try:
         content = ai_service.chat_completion(messages, temperature=0.4)
-        title = f"{request.exam_type} - Chapter {request.chapter_number} Question Paper ({request.total_marks} Marks)"
+        if request.chapter_number > 0:
+            title = f"{request.exam_type} - Chapter {request.chapter_number} Question Paper ({request.total_marks} Marks)"
+        else:
+            title = f"{request.exam_type} - Entire Book Question Paper ({request.total_marks} Marks)"
         
         return QuestionPaperResponse(
             title=title,

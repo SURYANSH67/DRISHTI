@@ -182,7 +182,7 @@ export default function TeacherPanel({
   };
 
   const handleGeneratePaper = async () => {
-    if (!selectedBookId || !selectedChapterNum) return;
+    if (!selectedBookId || selectedChapterNum === null) return;
     setGeneratingPaper(true);
     setGeneratedPaperMarkdown("");
     setGeneratedPaperTitle("");
@@ -1059,11 +1059,12 @@ export default function TeacherPanel({
               <div>
                 <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Target Chapter</label>
                 <select
-                  value={selectedChapterNum || ""}
-                  onChange={(e) => setSelectedChapterNum(e.target.value ? Number(e.target.value) : null)}
+                  value={selectedChapterNum === null ? "" : selectedChapterNum}
+                  onChange={(e) => setSelectedChapterNum(e.target.value === "" ? null : Number(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-350 rounded-xl text-xs text-slate-850 focus:outline-none focus:border-purple-500 font-semibold"
                 >
                   <option value="" disabled>Select Chapter...</option>
+                  <option value="0">Entire Book</option>
                   {selectedBook?.chapters.map((ch, idx) => (
                     <option key={idx} value={idx + 1}>Ch {idx + 1}: {ch.title}</option>
                   ))}
