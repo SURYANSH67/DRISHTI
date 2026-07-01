@@ -242,7 +242,7 @@ export default function AdminPanel({
             <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 shadow-md">
               <h3 className="text-lg font-bold mb-4 text-slate-850">Textbook Registry</h3>
               {books.length === 0 ? (
-                <p className="text-slate-500 text-xs py-8 text-center">No textbooks registered in the DRISHTI framework database.</p>
+                <p className="text-slate-500 text-xs py-8 text-center">No textbooks registered in the DRISHTI database.</p>
               ) : (
                 <div className="space-y-4">
                   {books.map(b => (

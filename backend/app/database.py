@@ -14,7 +14,7 @@ def get_db_connection() -> sqlite3.Connection:
     return conn
 
 def setup_database():
-    """Create all required tables for the DRISHTI framework if they do not exist."""
+    """Create all required tables for the DRISHTI if they do not exist."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
