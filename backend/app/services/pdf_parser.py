@@ -22,9 +22,12 @@ class PDFParser:
         
         # Determine chapters from TOC if available
         if toc:
-            # Filter for level 1 (chapters/units) or level 2
-            # TOC format: [level, title, page]
-            chapter_entries = [entry for entry in toc if entry[0] in (1, 2)]
+            # First try to filter for only Level 1 entries (actual chapters)
+            chapter_entries = [entry for entry in toc if entry[0] == 1]
+            # If that yields fewer than 3 chapters, fall back to Level 1 and 2 entries
+            if len(chapter_entries) < 3:
+                chapter_entries = [entry for entry in toc if entry[0] in (1, 2)]
+                
             for i, entry in enumerate(chapter_entries):
                 level, title, start_page = entry
                 # Make pages 1-indexed
@@ -221,12 +224,20 @@ class PDFParser:
                     detected_points.append((line_clean, page_num))
                     break
                     
-        # Filter duplicates/close headings
+        # Filter duplicates/close headings and duplicate titles (running page headers)
         filtered_points = []
         last_page = -10
+        seen_normalized_titles = set()
         for title, p_num in detected_points:
-            if p_num - last_page >= 3: # Chapters must be at least 3 pages apart
+            # Normalize title to prevent running page headers from triggering duplicate chapters
+            norm_title = re.sub(r'\s+', ' ', title.lower().strip())
+            # If it starts with a chapter/unit identifier, group by that identifier (e.g. "chapter 1")
+            chapter_match = re.search(r'^(chapter|unit|part)\s+\d+', norm_title)
+            title_key = chapter_match.group(0) if chapter_match else norm_title
+            
+            if p_num - last_page >= 3 and title_key not in seen_normalized_titles:
                 filtered_points.append((title, p_num))
+                seen_normalized_titles.add(title_key)
                 last_page = p_num
 
         # Re-build chapters with start and end pages
