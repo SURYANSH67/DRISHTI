@@ -1,0 +1,1520 @@
+import { useState, useEffect, useRef } from "react";
+import {
+  Home,
+  Database,
+  MessageSquare,
+  FileText,
+  Camera,
+  Award,
+  BarChart2,
+  Settings,
+  Search,
+  Bell,
+  User,
+  Upload,
+  Trash2,
+  Book,
+  RefreshCw,
+  LogOut,
+  Send,
+  Download,
+  Menu
+} from "lucide-react";
+import { api } from "../services/api";
+import type { BookOverview } from "../services/api";
+import MarkdownRenderer from "./MarkdownRenderer";
+
+interface TeacherPanelProps {
+  user: any;
+  books: BookOverview[];
+  selectedBookId: string;
+  setSelectedBookId: (id: string) => void;
+  selectedChapterNum: number | null;
+  setSelectedChapterNum: (num: number | null) => void;
+  fetchBooks: () => void;
+  onLogout: () => void;
+}
+
+type Tab = "dashboard" | "knowledge-base" | "chat" | "question-gen" | "grading" | "knowledge" | "analytics" | "settings";
+
+const EXAM_TYPES = ["Mid Semester", "End Semester", "Unit Test", "Practice Test", "Custom"];
+const PATTERNS = ["Standard (Balanced)", "University Pattern", "CBSE Pattern", "Competitive Exam", "Custom Pattern"];
+const DIFFICULTY_LEVELS = ["Easy", "Medium", "Hard", "Mixed"];
+const QUESTION_TYPES_LIST = [
+  { id: "MCQ", label: "MCQs" },
+  { id: "True/False", label: "True/False" },
+  { id: "Fill in the Blanks", label: "Fill in the Blanks" },
+  { id: "One Word", label: "One Word Questions" },
+  { id: "Short Answer", label: "Short Answer Questions" },
+  { id: "Long Answer", label: "Long Answer Questions" },
+  { id: "Case Study", label: "Case Study Questions" },
+  { id: "HOTS", label: "HOTS Questions" },
+  { id: "Assertion & Reason", label: "Assertion & Reason" },
+  { id: "Diagram Based", label: "Diagram-Based Questions" },
+  { id: "Numerical", label: "Numerical Problems" },
+  { id: "Formula Based", label: "Formula-Based Questions" }
+];
+const AI_OPTIONS_LIST = [
+  "Generate Answer Key",
+  "Generate Detailed Solutions",
+  "Generate Marking Scheme",
+  "Avoid Repeated Questions",
+  "Cover Complete Chapter",
+  "Include Previous Year Style Questions",
+  "Include Application-Based Questions",
+  "Include Real-World Scenarios",
+  "Randomize Questions"
+];
+
+export default function TeacherPanel({
+  user,
+  books,
+  selectedBookId,
+  setSelectedBookId,
+  selectedChapterNum,
+  setSelectedChapterNum,
+  fetchBooks,
+  onLogout
+}: TeacherPanelProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const selectedBook = books.find(b => b.book_id === selectedBookId);
+
+  // Collapsible sidebar & telemetry states
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Teacher assistant chat states
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Upload book state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+
+  // Advanced Question Paper Settings
+  const [examType, setExamType] = useState("Mid Semester");
+  const [pattern, setPattern] = useState("Standard (Balanced)");
+  const [totalMarks, setTotalMarks] = useState(50);
+  const [durationHours, setDurationHours] = useState(2);
+  const [difficulty, setDifficulty] = useState("Medium");
+  const [questionTypes, setQuestionTypes] = useState<string[]>([
+    "MCQ", "Short Answer", "Long Answer", "HOTS", "Numerical"
+  ]);
+  const [autoDistribute, setAutoDistribute] = useState(true);
+  const [customDistribution, setCustomDistribution] = useState<Record<string, number>>({
+    "MCQ": 10,
+    "True/False": 5,
+    "Fill in the Blanks": 5,
+    "One Word": 5,
+    "Short Answer": 5,
+    "Long Answer": 3,
+    "Case Study": 1,
+    "HOTS": 2,
+    "Diagram Based": 2,
+    "Numerical": 3
+  });
+  const [aiOptions, setAiOptions] = useState<string[]>([
+    "Generate Answer Key", "Generate Detailed Solutions", "Cover Complete Chapter", "Avoid Repeated Questions"
+  ]);
+
+  const [generatingPaper, setGeneratingPaper] = useState(false);
+  const [generatedPaperMarkdown, setGeneratedPaperMarkdown] = useState("");
+  const [generatedPaperTitle, setGeneratedPaperTitle] = useState("");
+
+  const toggleQuestionType = (typeId: string) => {
+    setQuestionTypes(prev =>
+      prev.includes(typeId)
+        ? prev.filter(t => t !== typeId)
+        : [...prev, typeId]
+    );
+  };
+
+  const toggleAiOption = (option: string) => {
+    setAiOptions(prev =>
+      prev.includes(option)
+        ? prev.filter(o => o !== option)
+        : [...prev, option]
+    );
+  };
+
+  // Grader Desk
+  const [evalQuestion, setEvalQuestion] = useState("");
+  const [evalRefAnswer, setEvalRefAnswer] = useState("");
+  const [evalStudentText, setEvalStudentText] = useState("");
+  const [evalFile, setEvalFile] = useState<File | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
+  const [evalResult, setEvalResult] = useState<any>(null);
+
+  const handleBookUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const newBook = await api.uploadBook(uploadFile, user.id, user.role, subjectName.trim() || undefined);
+      fetchBooks();
+      setSelectedBookId(newBook.book_id);
+      setUploadFile(null);
+      setSubjectName("");
+      alert(`Success: ${newBook.filename} has been uploaded and chapters split!`);
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to upload.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteBook = async (bookId: string) => {
+    if (!confirm("Are you sure you want to delete this book?")) return;
+    try {
+      await api.deleteBook(bookId);
+      fetchBooks();
+      if (selectedBookId === bookId) {
+        setSelectedBookId("");
+        setSelectedChapterNum(null);
+      }
+    } catch (err) {
+      alert("Delete failed.");
+    }
+  };
+
+  const handleGeneratePaper = async () => {
+    if (!selectedBookId || !selectedChapterNum) return;
+    setGeneratingPaper(true);
+    setGeneratedPaperMarkdown("");
+    setGeneratedPaperTitle("");
+    try {
+      const data = await api.generateQuestionPaper(
+        selectedBookId,
+        selectedChapterNum,
+        examType,
+        pattern,
+        totalMarks,
+        durationHours,
+        difficulty,
+        questionTypes,
+        autoDistribute,
+        autoDistribute ? undefined : customDistribution,
+        aiOptions
+      );
+      setGeneratedPaperMarkdown(data.content);
+      setGeneratedPaperTitle(data.title);
+    } catch (err: any) {
+      alert("Failed to generate question paper: " + err.message);
+    } finally {
+      setGeneratingPaper(false);
+    }
+  };
+
+  const handleDownloadPaper = () => {
+    if (!generatedPaperMarkdown) return;
+    const element = document.createElement("a");
+    const file = new Blob([generatedPaperMarkdown], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `${generatedPaperTitle.replace(/\s+/g, "_") || "Question_Paper"}.md`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleEvaluateAnswer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!evalQuestion.trim() || !evalRefAnswer.trim()) return;
+    setEvaluating(true);
+    setEvalResult(null);
+    try {
+      const result = await api.evaluateAnswer(
+        evalQuestion,
+        evalRefAnswer,
+        evalStudentText || undefined,
+        user.id,
+        evalFile || undefined,
+        selectedBookId || undefined,
+        selectedChapterNum || undefined
+      );
+      setEvalResult(result);
+    } catch (err) {
+      alert("Grading process failed.");
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  // Knowledge candidates states
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<"Pending" | "Approved" | "Rejected">("Pending");
+
+  const loadCandidates = async (status: "Pending" | "Approved" | "Rejected") => {
+    setCandidatesLoading(true);
+    try {
+      const data = await api.listKnowledgeCandidates(status);
+      setCandidates(data);
+    } catch (err) {
+      console.error("Failed to load candidates", err);
+    } finally {
+      setCandidatesLoading(false);
+    }
+  };
+
+  const handleVerifyCandidate = async (candidateId: string, status: "Approved" | "Rejected" | "Pending") => {
+    try {
+      await api.verifyKnowledgeCandidate(candidateId, status);
+      alert(`Candidate status updated successfully to ${status}!`);
+      loadCandidates(selectedStatus);
+    } catch (err: any) {
+      alert("Failed to verify candidate: " + err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "knowledge") {
+      loadCandidates(selectedStatus);
+    }
+  }, [activeTab, selectedStatus]);
+
+
+
+  // Submit tutor chat message
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+    const userMsg = { role: "user", content: chatInput.trim() };
+    setChatHistory(prev => [...prev, userMsg]);
+    setChatInput("");
+    setChatLoading(true);
+    try {
+      const response = await api.tutorChat(
+        selectedBookId || "general",
+        selectedChapterNum || null,
+        userMsg.content,
+        chatHistory
+      );
+      setChatHistory(prev => [...prev, { role: "assistant", content: response.answer }]);
+    } catch (err: any) {
+      setChatHistory(prev => [...prev, { role: "assistant", content: "Error: " + err.message }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
+  const totalChapters = books.reduce((acc, b) => acc + b.chapters.length, 0);
+  const totalChunks = books.reduce((acc, b) => acc + (b.total_pages || 0) * 8, 0);
+
+  return (
+    <div className="flex-1 flex flex-col md:flex-row relative">
+      {/* Sidebar Navigation */}
+      <aside className={`h-screen sticky top-0 bg-slate-55/90 backdrop-blur-md border-b md:border-b-0 md:border-r border-slate-200/80 p-4 flex flex-col z-10 transition-all duration-300 shrink-0 ${sidebarCollapsed ? "w-20" : "w-64"}`}>
+        <div className={`flex ${sidebarCollapsed ? "flex-col items-center gap-3 mb-6" : "flex-row items-center justify-between gap-2 mb-8"}`}>
+          <div className={`flex items-center gap-3 overflow-hidden ${sidebarCollapsed ? "justify-center" : ""}`}>
+            <img 
+              src="/drdo_logo.png" 
+              alt="DRDO Logo" 
+              className={`${sidebarCollapsed ? "w-8 h-8" : "w-10 h-10"} object-contain drop-shadow shrink-0 transition-all`} 
+            />
+            {!sidebarCollapsed && (
+              <div className="min-w-0 transition-opacity duration-300">
+                <h1 className="text-lg font-extrabold text-slate-800 leading-none truncate">DRISHTI</h1>
+                <span className="text-[10px] text-purple-650 font-extrabold tracking-wide uppercase mt-0.5 block truncate">Faculty Panel</span>
+              </div>
+            )}
+          </div>
+          
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1.5 hover:bg-slate-200/80 text-slate-500 rounded-lg cursor-pointer block"
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!sidebarCollapsed && (
+          <div className="mb-4 pb-4 border-b border-slate-200">
+            <span className="text-[10px] font-bold text-slate-400 block uppercase">Faculty:</span>
+            <span className="text-sm font-extrabold text-slate-800 truncate block">{user.name}</span>
+          </div>
+        )}
+
+        <nav className="flex-1 space-y-1">
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            title="Dashboard"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "dashboard" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Home className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Dashboard</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("knowledge-base")}
+            title="Knowledge Base"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "knowledge-base" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Database className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Knowledge Base</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("chat")}
+            title="AI Learning Assistant"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "chat" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>AI Assistant</span>}
+          </button>
+
+          {!sidebarCollapsed && (
+            <div className="pt-3 pb-1">
+              <span className="px-4 text-[9px] uppercase font-extrabold text-slate-400 tracking-wider">Evaluation Hub</span>
+            </div>
+          )}
+
+          <button
+            onClick={() => setActiveTab("question-gen")}
+            title="Question Paper Generator"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "question-gen" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <FileText className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Generate Papers</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("grading")}
+            title="Student Answer Evaluation"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "grading" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Camera className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Evaluate Answers</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("knowledge")}
+            title="Knowledge Desk"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "knowledge" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Award className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Knowledge Desk</span>}
+          </button>
+
+          {!sidebarCollapsed && (
+            <div className="pt-3 pb-1">
+              <span className="px-4 text-[9px] uppercase font-extrabold text-slate-400 tracking-wider">Reports & System</span>
+            </div>
+          )}
+
+          <button
+            onClick={() => setActiveTab("analytics")}
+            title="Student Analytics"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "analytics" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <BarChart2 className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Analytics</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("settings")}
+            title="Settings"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "settings" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Settings className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Settings</span>}
+          </button>
+        </nav>
+
+        {/* Selected book block */}
+        <div className="mt-auto pt-6 space-y-4">
+          {!sidebarCollapsed && books.length > 0 && (
+            <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 space-y-2 text-xs">
+              <label className="text-[10px] text-slate-500 block font-bold uppercase">Active Textbook:</label>
+              <select
+                value={selectedBookId}
+                onChange={(e) => {
+                  setSelectedBookId(e.target.value);
+                  setSelectedChapterNum(null);
+                }}
+                className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
+              >
+                {books.map(b => (
+                  <option key={b.book_id} value={b.book_id}>{b.filename}</option>
+                ))}
+              </select>
+
+              {selectedBook && (
+                <>
+                  <label className="text-[10px] text-slate-500 block font-bold uppercase">Active Chapter:</label>
+                  <select
+                    value={selectedChapterNum || ""}
+                    onChange={(e) => setSelectedChapterNum(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
+                  >
+                    <option value="">Entire Book</option>
+                    {selectedBook.chapters.map((ch, idx) => (
+                      <option key={idx} value={idx + 1}>Ch {idx + 1}: {ch.title.substring(0, 18)}...</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 hover:bg-red-50 hover:text-red-650 text-slate-550 text-xs font-bold transition-all bg-white"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Panel Content */}
+      <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-6xl mx-auto w-full z-10">
+        
+        {/* Dashboard Landing Page Tab */}
+        {activeTab === "dashboard" && (
+          <div className="space-y-4">
+            {/* Top Header - Compact 60px Height */}
+            <div className="flex items-center justify-between h-[60px] border-b border-slate-200 pb-2 mb-2 gap-4 shrink-0">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-2 w-3.5 h-3.5 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search knowledge, papers, evaluations..." 
+                  className="w-full pl-9 pr-4 py-1.5 border border-slate-200 rounded-xl text-xs bg-white/70 focus:outline-none focus:border-purple-500 font-medium" 
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setActiveTab("knowledge-base")} className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-755 font-bold rounded-lg text-[10px] flex items-center gap-1 transition-colors cursor-pointer">
+                  <Upload className="w-3 h-3" />
+                  Upload Book
+                </button>
+                <button onClick={() => setActiveTab("grading")} className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-755 font-bold rounded-lg text-[10px] flex items-center gap-1 transition-colors cursor-pointer">
+                  <Camera className="w-3 h-3" />
+                  New Assessment
+                </button>
+                <button onClick={() => setActiveTab("question-gen")} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 shadow shadow-purple-600/10 transition-colors cursor-pointer">
+                  <FileText className="w-3 h-3" />
+                  Generate Paper
+                </button>
+                <button className="p-1.5 hover:bg-slate-200/80 text-slate-500 rounded-lg bg-white border border-slate-200 relative">
+                  <Bell className="w-3.5 h-3.5" />
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-purple-600 rounded-full animate-pulse"></span>
+                </button>
+                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 h-6">
+                  <div className="w-6 h-6 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-650 font-bold text-[10px]">
+                    {user.name ? user.name[0].toUpperCase() : "A"}
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700 hidden lg:inline">{user.role || "Admin"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 12-Column Layout Grid */}
+            <div className="grid grid-cols-12 gap-4">
+              
+              {/* Row 1: Welcome Banner (8 Columns) & System Status (4 Columns) */}
+              <div className="col-span-12 lg:col-span-8 glass-panel p-4 rounded-2xl border border-slate-200 bg-gradient-to-tr from-purple-500/10 via-white/5 to-white/10 shadow-sm flex items-center justify-between h-[130px] overflow-hidden">
+                <div className="space-y-1.5 min-w-0">
+                  <h2 className="text-lg font-extrabold text-slate-800 leading-tight">Welcome Back, Faculty</h2>
+                  <p className="text-slate-500 text-[11px] max-w-lg leading-relaxed line-clamp-2">Educational Intelligence Command Center. Manage textbook knowledge bases, draft questions sheets, automate grading, and review conceptual learning outcomes.</p>
+                  <div className="flex gap-1.5 pt-0.5">
+                    <button onClick={() => setActiveTab("knowledge-base")} className="px-2.5 py-1 bg-purple-600 hover:bg-purple-750 text-white font-extrabold rounded-md text-[10px] transition-colors cursor-pointer shadow shadow-purple-600/10">
+                      Upload Book
+                    </button>
+                    <button onClick={() => setActiveTab("chat")} className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 text-slate-600 bg-white font-extrabold rounded-md text-[10px] transition-colors cursor-pointer">
+                      Ask AI
+                    </button>
+                    <button onClick={() => setActiveTab("question-gen")} className="px-2.5 py-1 border border-slate-200 hover:bg-slate-50 text-slate-600 bg-white font-extrabold rounded-md text-[10px] transition-colors cursor-pointer">
+                      Generate Paper
+                    </button>
+                  </div>
+                </div>
+                <img src="/drdo_logo.png" alt="Platform Logo" className="w-14 h-14 object-contain opacity-90 hidden sm:block shrink-0" />
+              </div>
+
+              <div className="col-span-12 lg:col-span-4 glass-panel p-4 rounded-2xl border border-slate-200 bg-white shadow-sm h-[130px] flex flex-col justify-between">
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System Status</span>
+                  <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Optimal
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] font-semibold text-slate-600 py-0.5">
+                  {[
+                    { name: "Online LLM", ok: true },
+                    { name: "Offline LLM", ok: true },
+                    { name: "Vector Store", ok: true },
+                    { name: "OCR Engine", ok: true },
+                  ].map((s, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span className="truncate">{s.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Row 2: 8 Statistics Cards in two rows of four (col-span-3 each) */}
+              {[
+                { title: "Books", val: books.length, icon: <Book className="w-3.5 h-3.5 text-blue-500" />, desc: "PDFs Loaded" },
+                { title: "Chapters", val: totalChapters, icon: <Database className="w-3.5 h-3.5 text-purple-500" />, desc: "Indexed Units" },
+                { title: "Students", val: books.length > 0 ? 45 : 0, icon: <User className="w-3.5 h-3.5 text-emerald-500" />, desc: "Registered" },
+                { title: "AI Chats", val: books.length > 0 ? 180 : 0, icon: <MessageSquare className="w-3.5 h-3.5 text-pink-500" />, desc: "Resolved" },
+                { title: "Papers", val: books.length > 0 ? 6 : 0, icon: <FileText className="w-3.5 h-3.5 text-indigo-500" />, desc: "Compiled Sheets" },
+                { title: "Assessments", val: books.length > 0 ? 14 : 0, icon: <Camera className="w-3.5 h-3.5 text-amber-500" />, desc: "OCR Graded" },
+                { title: "Avg Score", val: books.length > 0 ? "84.5%" : "--", icon: <BarChart2 className="w-3.5 h-3.5 text-sky-500" />, desc: "Class Mean" },
+                { title: "Accuracy", val: books.length > 0 ? "96%" : "--", icon: <Award className="w-3.5 h-3.5 text-red-500" />, desc: "OCR Extract" },
+              ].map((c, i) => (
+                <div key={i} className="col-span-6 lg:col-span-3 glass-panel p-3 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-between gap-2.5 h-[68px] hover:scale-[1.01] transition-transform duration-200">
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider truncate">{c.title}</span>
+                    <span className="text-base font-extrabold text-slate-800 mt-0.5 block leading-none">{c.val}</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-100 shrink-0">
+                    {c.icon}
+                  </div>
+                </div>
+              ))}
+
+              {/* Row 3: Student Performance (8 columns) & Quick Actions (4 columns) */}
+              <div className="col-span-12 lg:col-span-8 glass-panel p-4 rounded-2xl border border-slate-200 bg-white shadow-sm h-[220px] flex flex-col justify-between">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <BarChart2 className="w-3.5 h-3.5 text-purple-650" />
+                    Overall Student Performance
+                  </h3>
+                  <button onClick={() => setActiveTab("analytics")} className="text-[9px] text-purple-650 hover:underline font-extrabold uppercase cursor-pointer">
+                    View All Analytics →
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-4 gap-3 py-1.5 text-center text-xs">
+                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Cohort Mean</span>
+                    <span className="text-sm font-bold text-purple-755 mt-0.5 block">84.5%</span>
+                  </div>
+                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Highest</span>
+                    <span className="text-sm font-bold text-emerald-700 mt-0.5 block">98.2%</span>
+                  </div>
+                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Lowest</span>
+                    <span className="text-sm font-bold text-red-650 mt-0.5 block">61.0%</span>
+                  </div>
+                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Needs Help</span>
+                    <span className="text-sm font-bold text-amber-700 mt-0.5 block">12 Students</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1 pb-1">
+                  <div className="flex items-center gap-0.5 h-5 rounded-lg overflow-hidden border border-slate-200/40 text-[9px] font-bold text-white text-center">
+                    <div className="bg-emerald-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "31%" }} title="Grade A">A (31%)</div>
+                    <div className="bg-purple-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "41%" }} title="Grade B">B (41%)</div>
+                    <div className="bg-blue-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "20%" }} title="Grade C">C (20%)</div>
+                    <div className="bg-amber-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "8%" }} title="Grade D">D (8%)</div>
+                  </div>
+                  <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase pt-1">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Grade A (48)</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span> Grade B (64)</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> Grade C (32)</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Grade D (12)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-12 lg:col-span-4 glass-panel p-4 rounded-2xl border border-slate-200 bg-white shadow-sm h-[220px] flex flex-col justify-between">
+                <div className="border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Quick Actions</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-700 py-1">
+                  <button onClick={() => setActiveTab("knowledge-base")} className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-150 bg-slate-50/50 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-750 transition-all text-center cursor-pointer gap-1">
+                    <Upload className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Upload Book</span>
+                  </button>
+                  <button onClick={() => setActiveTab("chat")} className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-150 bg-slate-50/50 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-750 transition-all text-center cursor-pointer gap-1">
+                    <MessageSquare className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Consult AI</span>
+                  </button>
+                  <button onClick={() => setActiveTab("question-gen")} className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-150 bg-slate-50/50 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-750 transition-all text-center cursor-pointer gap-1">
+                    <FileText className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Build Exams</span>
+                  </button>
+                  <button onClick={() => setActiveTab("grading")} className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-150 bg-slate-50/50 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-750 transition-all text-center cursor-pointer gap-1">
+                    <Camera className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Grade Copy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 4: Recent Activity (6 Columns) & Repository Summary (6 Columns) */}
+              <div className="col-span-12 lg:col-span-6 glass-panel p-4 rounded-2xl border border-slate-200 bg-white shadow-sm h-[170px] flex flex-col justify-between">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Recent Activities</h3>
+                  <button onClick={() => setActiveTab("analytics")} className="text-[9px] text-purple-650 hover:underline font-extrabold uppercase cursor-pointer">View More</button>
+                </div>
+                <div className="space-y-2 text-[10px] text-slate-600 font-semibold overflow-y-auto pr-1 py-1">
+                  {[
+                    { text: "Textbook 'Cloud Computing' parsed & uploaded.", time: "10m ago" },
+                    { text: "Unit Test question booklet generated (Ch 3).", time: "1h ago" },
+                    { text: "Student handwriting answer copy processed.", time: "3h ago" },
+                    { text: "Knowledge Optimization approved for RAG Chat.", time: "Yesterday" },
+                  ].map((act, idx) => (
+                    <div key={idx} className="flex justify-between items-center gap-3 py-0.5 border-l-2 border-purple-300 pl-2">
+                      <span className="truncate">{act.text}</span>
+                      <span className="text-[8px] text-slate-400 font-bold uppercase shrink-0">{act.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="col-span-12 lg:col-span-6 glass-panel p-4 rounded-2xl border border-slate-200 bg-white shadow-sm h-[170px] flex flex-col justify-between">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Repository summary</h3>
+                  <button onClick={() => setActiveTab("knowledge-base")} className="text-[9px] text-purple-650 hover:underline font-extrabold uppercase cursor-pointer">Explore Base</button>
+                </div>
+                <div className="grid grid-cols-3 gap-2.5 text-[10px] font-semibold text-slate-650 py-1">
+                  <div className="p-2 bg-slate-50 border border-slate-100 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Documents</span>
+                    <span className="text-[11px] font-extrabold text-slate-800 block mt-0.5">{books.length} Books</span>
+                  </div>
+                  <div className="p-2 bg-slate-50 border border-slate-100 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Chapters</span>
+                    <span className="text-[11px] font-extrabold text-slate-800 block mt-0.5">{totalChapters} Units</span>
+                  </div>
+                  <div className="p-2 bg-slate-50 border border-slate-100 rounded-xl">
+                    <span className="text-[8px] text-slate-400 font-bold block uppercase">Chunks</span>
+                    <span className="text-[11px] font-extrabold text-slate-800 block mt-0.5">{totalChunks > 0 ? `${(totalChunks / 1000).toFixed(1)}K` : "0"} Chunks</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-450 font-extrabold uppercase pt-1 border-t border-slate-100">
+                  <span>FAISS Vector Database</span>
+                  <span>Embeddings: bge-small</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="text-center pt-4 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+              DRISHTI Educational Intelligence Platform • Version 1.0 • Powered by Hybrid LLM + RAG + Automated Assessment
+            </div>
+          </div>
+        )}
+
+        {/* Knowledge Base Tab */}
+        {activeTab === "knowledge-base" && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-200 pb-4">
+              <div>
+                <h2 className="text-3xl font-extrabold tracking-tight text-slate-800">Knowledge Repository</h2>
+                <p className="text-slate-550 text-sm mt-1">Manage active syllabus textbooks and upload educational materials to extract conceptual insights.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Syllabus Textbooks list */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 shadow-md bg-white lg:col-span-2 space-y-4">
+                <h3 className="text-md font-bold text-slate-800">Syllabus Textbooks Database</h3>
+                {books.length === 0 ? (
+                  <p className="text-slate-500 text-xs py-8 text-center">No textbooks uploaded. Head to the upload form on the right to populate your repository.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {books.map(b => (
+                      <div key={b.book_id} className="p-4 bg-slate-50/50 border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition-colors space-y-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <Book className="w-8 h-8 text-purple-650 shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm text-slate-800 truncate max-w-sm">{b.filename}</h4>
+                              {b.subject_name && (
+                                <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-700 border border-purple-200 rounded-md text-[10px] font-extrabold uppercase tracking-wide">
+                                  {b.subject_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <a
+                              href={api.getBookDownloadUrl(b.book_id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg text-blue-600 transition-colors cursor-pointer"
+                              title="Download PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                            <button
+                              onClick={() => setSelectedBookId(b.book_id)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                selectedBookId === b.book_id ? "bg-purple-100 text-purple-750 border border-purple-200" : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
+                              }`}
+                            >
+                              {selectedBookId === b.book_id ? "Selected" : "Select"}
+                            </button>
+                            <button onClick={() => handleDeleteBook(b.book_id)} className="p-1.5 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg text-red-550 transition-colors cursor-pointer">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-bold text-slate-500 uppercase">
+                          <div className="p-2 bg-white border border-slate-100 rounded-lg text-center">
+                            <span className="text-[9px] text-slate-400 block">Pages</span>
+                            <span className="text-xs font-extrabold text-slate-800 block">{b.total_pages}</span>
+                          </div>
+                          <div className="p-2 bg-white border border-slate-100 rounded-lg text-center">
+                            <span className="text-[9px] text-slate-400 block">Chapters</span>
+                            <span className="text-xs font-extrabold text-slate-800 block">{b.chapters.length}</span>
+                          </div>
+                          <div className="p-2 bg-white border border-slate-100 rounded-lg text-center">
+                            <span className="text-[9px] text-slate-400 block">Equations</span>
+                            <span className="text-xs font-extrabold text-slate-800 block">{b.formula_count}</span>
+                          </div>
+                          <div className="p-2 bg-white border border-slate-100 rounded-lg text-center">
+                            <span className="text-[9px] text-slate-400 block">Diagrams</span>
+                            <span className="text-xs font-extrabold text-slate-800 block">{b.image_count}</span>
+                          </div>
+                        </div>
+                        {b.chapters.length > 0 && (
+                          <div className="text-[10px] text-slate-500 font-semibold space-y-1 border-t border-slate-100 pt-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase block">Chapter Listing</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {b.chapters.map((ch, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[9px] text-slate-600 font-bold">
+                                  Ch {idx + 1}: {ch.title.length > 25 ? ch.title.substring(0, 25) + "…" : ch.title}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Textbook PDF Upload form */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 shadow-md bg-white lg:col-span-1 h-fit space-y-4">
+                <h3 className="text-md font-bold text-slate-800">Add Textbook PDF</h3>
+                <form onSubmit={handleBookUpload} className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Subject Name</label>
+                    <input
+                      type="text"
+                      value={subjectName}
+                      onChange={(e) => setSubjectName(e.target.value)}
+                      placeholder="e.g. Cloud Computing, Data Structures"
+                      className="w-full px-3 py-2 border border-slate-250 rounded-xl text-xs bg-white focus:outline-none focus:border-purple-500 font-medium"
+                    />
+                  </div>
+                  <div className="border-2 border-dashed border-slate-350 hover:border-purple-500/50 rounded-xl p-8 text-center cursor-pointer relative bg-slate-50/50 hover:bg-white transition-all">
+                    <input type="file" accept=".pdf" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    <Upload className="w-8 h-8 text-slate-450 mx-auto mb-2" />
+                    <span className="text-[11px] font-bold text-slate-700 block truncate">{uploadFile ? uploadFile.name : "Select PDF Textbook File"}</span>
+                  </div>
+                  {uploadError && <p className="text-xs text-red-650 font-semibold">{uploadError}</p>}
+                  <button type="submit" disabled={uploading || !uploadFile} className="w-full py-2.5 bg-purple-600 hover:bg-purple-750 disabled:bg-slate-200 disabled:text-slate-450 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer text-white shadow shadow-purple-600/10">
+                    {uploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Upload and Parse"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI Learning Assistant Tab */}
+        {activeTab === "chat" && (
+          <div className="glass-panel rounded-2xl border border-slate-200/80 shadow-md bg-white flex flex-col h-[75vh]">
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-55/50 rounded-t-2xl">
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-sm">Faculty Learning & Research Assistant</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Active Source: {selectedBook ? selectedBook.filename : "General Knowledge"}</p>
+              </div>
+              <button onClick={() => setChatHistory([])} className="px-2.5 py-1 text-slate-500 hover:text-purple-650 border border-slate-200 bg-white rounded-lg text-[10px] font-bold transition-all cursor-pointer">Clear History</button>
+            </div>
+            
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 text-xs">
+              {chatHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center max-w-sm mx-auto">
+                  <MessageSquare className="w-10 h-10 text-purple-400 mb-2 animate-bounce" />
+                  <span className="font-bold text-slate-700">Ask the RAG Assistant</span>
+                  <p className="text-[11px] text-slate-450 mt-1 leading-relaxed">Ask scientific questions, query equations, or draft student reading guides. Context is automatically grounded in your uploaded textbook.</p>
+                </div>
+              ) : (
+                chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] p-3 rounded-2xl leading-relaxed ${
+                      msg.role === 'user' 
+                        ? 'bg-purple-600 text-white rounded-tr-none' 
+                        : 'bg-slate-100 text-slate-850 border border-slate-200/60 rounded-tl-none prose prose-slate max-w-none text-xs'
+                    }`}>
+                      {msg.role === 'assistant' ? <MarkdownRenderer content={msg.content} /> : msg.content}
+                    </div>
+                  </div>
+                ))
+              )}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 text-slate-500 p-3 rounded-2xl rounded-tl-none border border-slate-200/60 flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                    <span>Synthesizing response...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-slate-50/50 rounded-b-2xl flex gap-2">
+              <input 
+                type="text" 
+                value={chatInput} 
+                onChange={(e) => setChatInput(e.target.value)} 
+                placeholder="Ask assistant about textbook, formulas, or lesson plans..." 
+                className="flex-1 bg-white border border-slate-250 rounded-xl px-4 py-2.5 text-xs text-slate-850 focus:outline-none focus:border-purple-500 font-semibold"
+                disabled={chatLoading}
+              />
+              <button 
+                type="submit" 
+                disabled={chatLoading || !chatInput.trim()}
+                className="p-2.5 bg-purple-600 hover:bg-purple-750 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl transition-all shadow shadow-purple-600/10 cursor-pointer flex items-center justify-center shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Student Analytics Tab */}
+        {activeTab === "analytics" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-slate-800">Student & Platform Analytics</h2>
+              <p className="text-slate-550 text-sm mt-1">Review classroom performance benchmarks, weak area indicators, and AI model usage metrics.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cohort Grade Distribution */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 bg-white shadow-md space-y-4">
+                <h3 className="text-sm font-bold text-slate-800">Grade Breakdown (DRISHTI Cohort-A)</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: "Grade A (>90% Marks)", count: 48, pct: 31, color: "bg-emerald-500" },
+                    { label: "Grade B (80-90% Marks)", count: 64, pct: 41, color: "bg-purple-500" },
+                    { label: "Grade C (70-80% Marks)", count: 32, pct: 20, color: "bg-blue-500" },
+                    { label: "Grade D (60-70% Marks)", count: 12, pct: 8, color: "bg-amber-500" },
+                  ].map((g, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-semibold text-slate-650">
+                        <span>{g.label}</span>
+                        <span>{g.count} Students ({g.pct}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200/40">
+                        <div className={`${g.color} h-full`} style={{ width: `${g.pct}%` }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Today's AI usage stats */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 bg-white shadow-md space-y-4">
+                <h3 className="text-sm font-bold text-slate-800">Today's AI Agent Activity</h3>
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-650">
+                  <div className="p-3 bg-slate-50 border border-slate-200/40 rounded-xl">
+                    <span className="text-[9px] text-slate-400 font-bold block uppercase mb-1">Questions Answered</span>
+                    <span className="text-md font-bold text-slate-800">412 Queries</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200/40 rounded-xl">
+                    <span className="text-[9px] text-slate-400 font-bold block uppercase mb-1">Papers Generated</span>
+                    <span className="text-md font-bold text-slate-800">8 Exams</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200/40 rounded-xl">
+                    <span className="text-[9px] text-slate-400 font-bold block uppercase mb-1">Grading Sessions</span>
+                    <span className="text-md font-bold text-slate-800">124 Submissions</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200/40 rounded-xl">
+                    <span className="text-[9px] text-slate-400 font-bold block uppercase mb-1">Response Latency</span>
+                    <span className="text-md font-bold text-slate-800">1.4 seconds</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance Indicators */}
+            <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 bg-white shadow-md space-y-4">
+              <h3 className="text-sm font-bold text-slate-800">Syllabus Weak Spot Warnings</h3>
+              <p className="text-xs text-slate-505 leading-normal">Chapters below average accuracy of 70% based on recent student quiz outcomes.</p>
+              <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-200 p-2.5 font-bold text-slate-700 uppercase text-[9px] tracking-wider">
+                  <span>Textbook / Book ID</span>
+                  <span>Chapter Identifier</span>
+                  <span className="text-right">Average Score</span>
+                </div>
+                {books.length === 0 ? (
+                  <div className="p-4 text-center text-slate-400 italic">No historical evaluations found.</div>
+                ) : (
+                  books.map((b, idx) => (
+                    <div key={idx} className="grid grid-cols-3 p-3 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50">
+                      <span className="font-semibold text-slate-800 truncate">{b.filename}</span>
+                      <span className="text-slate-655 font-medium">Chapter 2: Conceptual Fundamentals</span>
+                      <span className="text-right font-bold text-red-550">64.5%</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Platform Settings Tab */}
+        {activeTab === "settings" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-slate-800">Platform Settings</h2>
+              <p className="text-slate-550 text-sm mt-1">Configure language model preferences, check API connections, and manage workspace parameters.</p>
+            </div>
+
+            <div className="glass-panel p-6 rounded-2xl border border-slate-200/80 bg-white shadow-md space-y-6">
+              <div className="border-b border-slate-150 pb-4">
+                <h3 className="text-md font-bold text-slate-850">Language Model & API Config</h3>
+                <p className="text-xs text-slate-500 mt-1">DRISHTI uses a hybrid retrieval model merging cloud APIs with secure local offline fallback servers.</p>
+              </div>
+
+              <div className="space-y-4 text-xs font-semibold text-slate-750">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Active RAG Model Provider</label>
+                    <select className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-xl focus:outline-none focus:border-purple-500 font-bold">
+                      <option>Gemini 1.5 Pro (Recommended)</option>
+                      <option>Groq API (Llama 3 70B)</option>
+                      <option>Local Llama-3-8B-Instruct (Offline fallback)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Vector Store Backend</label>
+                    <select className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-xl focus:outline-none focus:border-purple-500 font-bold" disabled>
+                      <option>ChromaDB Vector Store (FAISS fallback)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold block mb-2 tracking-wider">API Authentication Checks</span>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                      <span className="text-emerald-800 text-[10px] uppercase font-bold">Gemini API Key</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">ACTIVE</span>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                      <span className="text-emerald-800 text-[10px] uppercase font-bold">Groq API Key</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">ACTIVE</span>
+                    </div>
+                    <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl flex items-center justify-between">
+                      <span className="text-purple-800 text-[10px] uppercase font-bold">Local Server Port</span>
+                      <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-bold">:8000</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Question generator */}
+        {activeTab === "question-gen" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Configuration Column */}
+            <div className="glass-panel p-6 rounded-2xl lg:col-span-5 space-y-5 h-fit border border-slate-200/80 shadow-md">
+              <div className="border-b border-slate-200 pb-3">
+                <h3 className="text-lg font-bold text-slate-800">Question Paper Configuration</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Design exam parameters and let AI build balanced tests.</p>
+              </div>
+
+              {/* Target Chapter selection */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Target Chapter</label>
+                <select
+                  value={selectedChapterNum || ""}
+                  onChange={(e) => setSelectedChapterNum(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full px-3 py-2 bg-white border border-slate-350 rounded-xl text-xs text-slate-850 focus:outline-none focus:border-purple-500 font-semibold"
+                >
+                  <option value="" disabled>Select Chapter...</option>
+                  {selectedBook?.chapters.map((ch, idx) => (
+                    <option key={idx} value={idx + 1}>Ch {idx + 1}: {ch.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Exam parameters (Type, Pattern, Difficulty) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Exam Type</label>
+                  <select
+                    value={examType}
+                    onChange={(e) => setExamType(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-white border border-slate-350 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
+                  >
+                    {EXAM_TYPES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Pattern</label>
+                  <select
+                    value={pattern}
+                    onChange={(e) => setPattern(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-white border border-slate-350 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
+                  >
+                    {PATTERNS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Difficulty</label>
+                  <select
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-white border border-slate-350 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
+                  >
+                    {DIFFICULTY_LEVELS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Total Marks & Duration */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Total Marks</label>
+                  <div className="flex gap-1.5">
+                    {[25, 50, 70, 100].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setTotalMarks(m)}
+                        className={`flex-1 py-1 rounded text-xs font-extrabold transition-all border ${
+                          totalMarks === m 
+                            ? "bg-purple-600 border-purple-600 text-white shadow shadow-purple-600/10" 
+                            : "bg-white border-slate-300 text-slate-650 hover:bg-slate-50"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Duration (Hours)</label>
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3].map(h => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setDurationHours(h)}
+                        className={`flex-1 py-1 rounded text-xs font-extrabold transition-all border ${
+                          durationHours === h 
+                            ? "bg-purple-600 border-purple-600 text-white shadow shadow-purple-600/10" 
+                            : "bg-white border-slate-300 text-slate-650 hover:bg-slate-50"
+                        }`}
+                      >
+                        {h}h
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Include in Paper */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-505 block mb-1.5 uppercase tracking-wide">Include in Paper</label>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  {QUESTION_TYPES_LIST.map((qType) => {
+                    const isChecked = questionTypes.includes(qType.id);
+                    return (
+                      <label key={qType.id} className="flex items-center gap-2 text-[11px] font-bold text-slate-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleQuestionType(qType.id)}
+                          className="accent-purple-600 rounded cursor-pointer"
+                        />
+                        {qType.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Smart Distribution */}
+              <div className="border-t border-slate-100 pt-3">
+                <label className="flex items-center gap-2 text-xs font-extrabold text-slate-800 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoDistribute}
+                    onChange={(e) => setAutoDistribute(e.target.checked)}
+                    className="accent-purple-600 rounded cursor-pointer"
+                  />
+                  Auto Generate Balanced Question Paper
+                </label>
+                <p className="text-[10px] text-slate-400 mt-0.5 ml-5 font-semibold">
+                  AI will distribute questions automatically based on chapter length and marks.
+                </p>
+                
+                {!autoDistribute && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 mt-3 max-h-48 overflow-y-auto">
+                    <span className="text-[9px] text-slate-450 uppercase font-extrabold block">Question Distribution Details</span>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      {QUESTION_TYPES_LIST.filter(q => questionTypes.includes(q.id)).map((q) => (
+                        <div key={q.id} className="flex items-center justify-between gap-2">
+                          <span className="text-slate-650 font-bold truncate text-[11px]">{q.label}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={customDistribution[q.id] ?? 0}
+                            onChange={(e) => setCustomDistribution(prev => ({ ...prev, [q.id]: Number(e.target.value) }))}
+                            className="w-12 px-1 py-0.5 border border-slate-350 bg-white rounded text-center text-xs font-bold text-slate-800"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Options */}
+              <div className="border-t border-slate-100 pt-3">
+                <label className="text-[10px] font-bold text-slate-505 block mb-1.5 uppercase tracking-wide">AI Settings & Pedagogical Rules</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  {AI_OPTIONS_LIST.map((opt) => {
+                    const isChecked = aiOptions.includes(opt);
+                    return (
+                      <label key={opt} className="flex items-center gap-2 text-[11px] font-bold text-slate-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleAiOption(opt)}
+                          className="accent-purple-600 rounded cursor-pointer"
+                        />
+                        {opt}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Generate Button */}
+              <button
+                onClick={handleGeneratePaper}
+                disabled={generatingPaper || !selectedChapterNum || questionTypes.length === 0}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-750 disabled:bg-slate-200 disabled:text-slate-400 font-extrabold text-white rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-600/10"
+              >
+                {generatingPaper ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Compiling Question Paper...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>📄 Generate Question Paper</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Output Column (Preview & Action panel) */}
+            <div className="glass-panel p-6 rounded-2xl lg:col-span-7 min-h-[60vh] flex flex-col border border-slate-200/80 shadow-md">
+              {generatedPaperMarkdown ? (
+                <div className="flex-1 flex flex-col space-y-4">
+                  <div className="pb-3 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-extrabold text-slate-800 text-sm">{generatedPaperTitle || "Generated Question Paper"}</h3>
+                      <span className="text-[10px] text-purple-650 font-bold block uppercase tracking-wide">Official Exam Layout</span>
+                    </div>
+                    <button
+                      onClick={handleDownloadPaper}
+                      className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 border border-purple-200 text-purple-755 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      Download Markdown
+                    </button>
+                  </div>
+                  <div className="flex-1 bg-white border border-slate-250 rounded-xl p-6 overflow-y-auto max-h-[70vh] prose prose-slate max-w-none text-xs">
+                    <MarkdownRenderer content={generatedPaperMarkdown} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                  <FileText className="w-12 h-12 text-slate-350 mb-2" />
+                  <span className="text-xs font-semibold">Configure parameters and compile chapter question banks.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Answer Grading tab */}
+        {activeTab === "grading" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="glass-panel p-6 rounded-2xl lg:col-span-1 space-y-4 h-fit border border-slate-200/80 shadow-md">
+              <h3 className="text-md font-bold text-slate-855">Grading Submission</h3>
+              <form onSubmit={handleEvaluateAnswer} className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Question prompt</label>
+                  <textarea value={evalQuestion} onChange={(e) => setEvalQuestion(e.target.value)} placeholder="Question prompt..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Model answer key</label>
+                  <textarea value={evalRefAnswer} onChange={(e) => setEvalRefAnswer(e.target.value)} placeholder="Reference answer..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Upload student handwriting copy</label>
+                  <input type="file" onChange={(e) => setEvalFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-650 bg-white p-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Or type student response</label>
+                  <textarea value={evalStudentText} onChange={(e) => setEvalStudentText(e.target.value)} placeholder="Type student answer..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" />
+                </div>
+                <button type="submit" disabled={evaluating} className="w-full py-3 bg-purple-600 hover:bg-purple-750 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors">
+                  {evaluating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Grade submission"}
+                </button>
+              </form>
+            </div>
+
+            <div className="glass-panel p-6 rounded-2xl lg:col-span-2 min-h-[50vh] flex flex-col border border-slate-200/80 shadow-md">
+              {evalResult ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                    <h3 className="font-extrabold text-slate-800">Grading Assessment Summary</h3>
+                    <span className="text-2xl font-bold text-purple-650">{evalResult.score}/10</span>
+                  </div>
+                  {evalResult.handwriting_ocr_text && (
+                    <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs shadow-sm">
+                      <span className="font-bold text-slate-500 block mb-1 uppercase text-[10px]">OCR Transcribed Text:</span>
+                      <p className="text-slate-700 italic">"{evalResult.handwriting_ocr_text}"</p>
+                    </div>
+                  )}
+                  <div className="space-y-2 text-xs">
+                    <p className="text-slate-650"><strong className="text-slate-800">Accuracy:</strong> {evalResult.concept_accuracy}</p>
+                    <p className="text-slate-650"><strong className="text-slate-800">Suggestions:</strong> {evalResult.suggestions}</p>
+                    <p className="text-slate-650"><strong className="text-slate-800">Feedback:</strong> {evalResult.overall_feedback}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                  <Camera className="w-12 h-12 text-slate-300 mb-2" />
+                  <span className="text-xs">Submit a written response copy to run evaluation checks.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Knowledge Desk tab */}
+        {activeTab === "knowledge" && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center border-b border-slate-200 pb-4 gap-4">
+              <div>
+                <h2 className="text-3xl font-extrabold tracking-tight text-slate-800">Continuous Knowledge Desk</h2>
+                <p className="text-slate-550 text-sm mt-1">Review student answer optimizations, analogies, and alternative explanations to enhance the RAG tutoring database.</p>
+              </div>
+              
+              <div className="flex gap-2 self-start md:self-auto">
+                {(["Pending", "Approved", "Rejected"] as const).map(status => (
+                  <button
+                    key={status}
+                    onClick={() => setSelectedStatus(status)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                      selectedStatus === status 
+                        ? "bg-purple-600 border-purple-600 text-white shadow shadow-purple-600/10" 
+                        : "bg-white border-slate-250 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {status} Candidates
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {candidatesLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <RefreshCw className="w-10 h-10 animate-spin text-purple-600 mb-2" />
+                <span className="text-xs font-bold uppercase tracking-wider">Retrieving candidates...</span>
+              </div>
+            ) : candidates.length === 0 ? (
+              <div className="glass-panel p-12 text-center border border-slate-200/80 shadow-md rounded-2xl bg-white/50">
+                <Award className="w-12 h-12 text-slate-350 mx-auto mb-2" />
+                <h3 className="font-extrabold text-slate-700 text-sm">No Enhancements Found</h3>
+                <p className="text-xs text-slate-450 mt-1 max-w-md mx-auto">No student-derived explanation candidates are currently marked as {selectedStatus.toLowerCase()}. Upload student grading sheets to extract conceptual insights.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {candidates.map(candidate => {
+                  let correctList = [];
+                  let missedList = [];
+                  try {
+                    correctList = JSON.parse(candidate.concepts_correct || "[]");
+                    missedList = JSON.parse(candidate.concepts_missed || "[]");
+                  } catch (e) {}
+
+                  return (
+                    <div key={candidate.id} className="glass-panel p-6 rounded-2xl border border-slate-200/80 shadow-md bg-white/80 space-y-4">
+                      {/* Card Header info */}
+                      <div className="flex justify-between items-start border-b border-slate-100 pb-3 flex-wrap gap-2 text-xs">
+                        <div>
+                          <span className="font-extrabold text-slate-800 text-sm block">{candidate.subject}</span>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase block mt-0.5">Chapter {candidate.chapter_number} • Evaluated {new Date(candidate.timestamp).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 rounded bg-slate-100 text-[10px] text-slate-650 font-bold uppercase border border-slate-200">
+                            Similarity: {Math.round(candidate.similarity_score * 100)}%
+                          </span>
+                          <span className="px-2 py-1 rounded bg-purple-50 text-[10px] text-purple-750 font-bold uppercase border border-purple-100">
+                            AI Confidence: {Math.round(candidate.confidence_score * 100)}%
+                          </span>
+                          <span className="px-2 py-1 rounded bg-amber-50 text-[10px] text-amber-750 font-bold uppercase border border-amber-100">
+                            Student Score: {candidate.marks}/10
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Question */}
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Question</span>
+                        <p className="text-xs font-bold text-slate-850 leading-relaxed bg-white p-3 border border-slate-250 rounded-xl">{candidate.question}</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Reference Base Answer */}
+                        <div>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Base Reference Answer Key</span>
+                          <div className="text-[11px] text-slate-600 bg-slate-50 p-3 border border-slate-250 rounded-xl max-h-36 overflow-y-auto leading-relaxed">
+                            {candidate.official_answer}
+                          </div>
+                        </div>
+
+                        {/* Student Answer */}
+                        <div>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Student's Alternative Solution / Analogy</span>
+                          <div className="text-[11px] text-purple-650 bg-purple-50/30 p-3 border border-purple-250/40 rounded-xl max-h-36 overflow-y-auto italic leading-relaxed">
+                            "{candidate.student_answer}"
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Concept badges */}
+                      <div className="flex flex-wrap gap-4 text-xs">
+                        {correctList.length > 0 && (
+                          <div>
+                            <span className="text-[9px] text-slate-450 uppercase font-bold block mb-1">Correct Concepts Identified</span>
+                            <div className="flex flex-wrap gap-1">
+                              {correctList.map((c: string, i: number) => (
+                                <span key={i} className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-100">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {missedList.length > 0 && (
+                          <div>
+                            <span className="text-[9px] text-slate-450 uppercase font-bold block mb-1">Missed Concepts</span>
+                            <div className="flex flex-wrap gap-1">
+                              {missedList.map((c: string, i: number) => (
+                                <span key={i} className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-semibold border border-red-100">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* AI Proposed Explanation candidate */}
+                      <div className="border border-purple-200 rounded-2xl p-4 bg-gradient-to-tr from-purple-50/20 to-white/40 shadow-sm space-y-2">
+                        <span className="text-[10px] text-purple-650 font-bold uppercase block tracking-wider">AI Proposed Explanation Optimization (Candidate)</span>
+                        <div className="text-xs text-slate-750 prose prose-slate max-w-none max-h-60 overflow-y-auto bg-white p-4 border border-slate-250 rounded-xl">
+                          <MarkdownRenderer content={candidate.improved_explanation} />
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex justify-end gap-2 pt-2">
+                        {candidate.verification_status === "Pending" && (
+                          <>
+                            <button
+                              onClick={() => handleVerifyCandidate(candidate.id, "Rejected")}
+                              className="px-4 py-2 border border-red-200 bg-red-50 text-red-650 font-extrabold hover:bg-red-105 rounded-xl text-xs transition-colors cursor-pointer"
+                            >
+                              Reject Optimization
+                            </button>
+                            <button
+                              onClick={() => handleVerifyCandidate(candidate.id, "Approved")}
+                              className="px-4 py-2 bg-purple-600 hover:bg-purple-750 text-white font-extrabold rounded-xl text-xs transition-all shadow shadow-purple-600/10 cursor-pointer"
+                            >
+                              Approve Optimization
+                            </button>
+                          </>
+                        )}
+                        {candidate.verification_status === "Approved" && (
+                          <div className="flex items-center gap-3 w-full justify-between">
+                            <span className="text-[11px] text-emerald-650 font-extrabold flex items-center gap-1">
+                              ✓ Approved & Integrated into Tutor RAG Knowledge Store
+                            </span>
+                            <button
+                              onClick={() => handleVerifyCandidate(candidate.id, "Rejected")}
+                              className="px-3 py-1.5 border border-slate-200 bg-white text-red-550 font-extrabold hover:bg-red-50 rounded-lg text-xs transition-colors cursor-pointer"
+                            >
+                              Revoke Approval
+                            </button>
+                          </div>
+                        )}
+                        {candidate.verification_status === "Rejected" && (
+                          <div className="flex items-center gap-3 w-full justify-between">
+                            <span className="text-[11px] text-red-550 font-extrabold">
+                              ✗ Rejected (Not active in Tutor RAG Store)
+                            </span>
+                            <button
+                              onClick={() => handleVerifyCandidate(candidate.id, "Pending")}
+                              className="px-3 py-1.5 border border-slate-200 bg-white text-slate-650 font-extrabold hover:bg-slate-50 rounded-lg text-xs transition-colors cursor-pointer"
+                            >
+                              Reconsider Candidate
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

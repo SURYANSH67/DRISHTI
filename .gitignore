@@ -1,0 +1,38 @@
+# Virtual environment
+backend/venv/
+venv/
+.venv/
+env/
+
+# Databases, metadata, and user uploads
+backend/data/
+backend/app/data/
+*.db
+*.db-journal
+*.sqlite
+*.json
+
+# Allow package.json, tsconfig.json, and other config JSONs
+!package.json
+!package-lock.json
+!tsconfig*.json
+!.oxlintrc.json
+
+# Secret keys and environment variables
+.env
+.env.*
+!.env.example
+
+# Node dependencies and build files
+frontend/node_modules/
+node_modules/
+frontend/dist/
+dist/
+
+# System / IDE files
+.DS_Store
+.vscode/
+.idea/
+.pytest_cache/
+__pycache__/
+*.pyc
