@@ -207,9 +207,21 @@ class PDFParser:
 
     @staticmethod
     def _detect_chapters_heuristically(doc, total_pages: int) -> List[Dict[str, Any]]:
-        """Identify chapters based on heading patterns (e.g. Chapter 1, Introduction)."""
+        """Identify chapters based on heading patterns and page layout text."""
         chapters = []
-        pattern = re.compile(r'^(chapter|unit|part|section)\s+\d+|introduction|conclusion|appendix', re.IGNORECASE)
+        
+        strong_pattern = re.compile(
+            r'^\s*(chapter|unit|part)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen)\b', 
+            re.IGNORECASE
+        )
+        fallback_pattern = re.compile(
+            r'^\s*(introduction|conclusion|appendix|preface|foreword)\b', 
+            re.IGNORECASE
+        )
+        skip_pattern = re.compile(
+            r'\b(answers|exercises|index|bibliography|references|contents|toc|foreword|preface|acknowledgements)\b', 
+            re.IGNORECASE
+        )
         
         detected_points = []
         
@@ -217,22 +229,58 @@ class PDFParser:
             page = doc[page_num - 1]
             text = page.get_text("text").split('\n')
             
-            # Look at first few lines for headings
-            for line in text[:5]:
-                line_clean = line.strip()
-                if len(line_clean) < 60 and pattern.search(line_clean):
-                    detected_points.append((line_clean, page_num))
+            text_clean = [t.strip() for t in text if t.strip()]
+            
+            # Check if this page should be skipped (front matter or answers sheet)
+            should_skip = False
+            for line in text_clean[:10]:
+                if skip_pattern.search(line):
+                    should_skip = True
                     break
+            if should_skip:
+                continue
+                
+            # Check for strong matches anywhere on the page
+            strong_matches = []
+            for line in text_clean:
+                if len(line) < 60 and strong_pattern.match(line):
+                    strong_matches.append(line)
                     
-        # Filter duplicates/close headings and duplicate titles (running page headers)
+            if len(strong_matches) == 1:
+                matched_line = strong_matches[0]
+                # Attempt to gather full title from subsequent lines
+                title_parts = [matched_line]
+                try:
+                    idx = text_clean.index(matched_line)
+                    for next_line in text_clean[idx+1 : idx+4]:
+                        if re.search(r'\b(reprint|edition|chapter|section|physics|introduction)\b|\d+', next_line, re.IGNORECASE):
+                            break
+                        title_parts.append(next_line)
+                except Exception:
+                    pass
+                full_title = " ".join(title_parts)
+                full_title = re.sub(r'[*†‡§#]', '', full_title)
+                full_title = re.sub(r'\s+', ' ', full_title).strip()
+                full_title = full_title.title()
+                detected_points.append((full_title, page_num))
+                continue
+            elif len(strong_matches) > 1:
+                # Skip Table of Contents pages
+                continue
+                
+            # Check fallback in first 5 lines
+            for line in text_clean[:5]:
+                if len(line) < 60 and fallback_pattern.match(line):
+                    detected_points.append((line.title(), page_num))
+                    break
+
+        # Filter duplicates/close headings
         filtered_points = []
         last_page = -10
         seen_normalized_titles = set()
         for title, p_num in detected_points:
-            # Normalize title to prevent running page headers from triggering duplicate chapters
             norm_title = re.sub(r'\s+', ' ', title.lower().strip())
-            # If it starts with a chapter/unit identifier, group by that identifier (e.g. "chapter 1")
-            chapter_match = re.search(r'^(chapter|unit|part)\s+\d+', norm_title)
+            chapter_match = strong_pattern.match(norm_title)
             title_key = chapter_match.group(0) if chapter_match else norm_title
             
             if p_num - last_page >= 3 and title_key not in seen_normalized_titles:
