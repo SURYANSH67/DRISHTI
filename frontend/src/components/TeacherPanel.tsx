@@ -220,6 +220,108 @@ export default function TeacherPanel({
     document.body.removeChild(element);
   };
 
+  const handleDownloadPDF = () => {
+    if (!generatedPaperMarkdown) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to save/download the PDF.");
+      return;
+    }
+    const container = document.getElementById("question-paper-preview");
+    const paperHtml = container ? container.innerHTML : "";
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${generatedPaperTitle || "Question Paper"}</title>
+          <style>
+            body {
+              font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              padding: 40px;
+              color: #0f172a;
+              line-height: 1.6;
+              font-size: 13px;
+            }
+            h1 {
+              font-size: 22px;
+              font-weight: 800;
+              text-align: center;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+              color: #1e293b;
+            }
+            h2 {
+              font-size: 14px;
+              font-weight: 700;
+              margin-top: 25px;
+              border-bottom: 2px solid #cbd5e1;
+              padding-bottom: 4px;
+              color: #1e293b;
+            }
+            h3 {
+              font-size: 12px;
+              font-weight: 600;
+              margin-top: 15px;
+              color: #334155;
+            }
+            p {
+              margin-bottom: 8px;
+            }
+            ul, ol {
+              margin-left: 20px;
+              margin-bottom: 12px;
+            }
+            li {
+              margin-bottom: 4px;
+            }
+            hr {
+              border: 0;
+              border-top: 1px solid #e2e8f0;
+              margin: 20px 0;
+            }
+            strong {
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 15px 0;
+              font-size: 12px;
+            }
+            th, td {
+              border: 1px solid #cbd5e1;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f1f5f9;
+              font-weight: 700;
+            }
+            @media print {
+              body {
+                padding: 10px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="paper-content">
+            ${paperHtml}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handleEvaluateAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!evalQuestion.trim() || !evalRefAnswer.trim()) return;
@@ -1261,14 +1363,25 @@ export default function TeacherPanel({
                       <h3 className="font-extrabold text-slate-800 text-sm">{generatedPaperTitle || "Generated Question Paper"}</h3>
                       <span className="text-[10px] text-purple-650 font-bold block uppercase tracking-wide">Official Exam Layout</span>
                     </div>
-                    <button
-                      onClick={handleDownloadPaper}
-                      className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 border border-purple-200 text-purple-755 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors"
-                    >
-                      Download Markdown
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleDownloadPaper}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Download raw Markdown file"
+                      >
+                        Download MD
+                      </button>
+                      <button
+                        onClick={handleDownloadPDF}
+                        className="px-3 py-1.5 bg-purple-650 hover:bg-purple-750 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-purple-600/10"
+                        title="Save or print as structured PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download PDF
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1 bg-white border border-slate-250 rounded-xl p-6 overflow-y-auto max-h-[70vh] prose prose-slate max-w-none text-xs">
+                  <div id="question-paper-preview" className="flex-1 bg-white border border-slate-250 rounded-xl p-6 overflow-y-auto max-h-[70vh] prose prose-slate max-w-none text-xs">
                     <MarkdownRenderer content={generatedPaperMarkdown} />
                   </div>
                 </div>
