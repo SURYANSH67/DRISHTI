@@ -575,15 +575,23 @@ export default function StudentPanel({
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white/40">
-                {chatMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed ${
-                      msg.role === "user" ? "bg-purple-600 text-white rounded-br-none" : "bg-white border border-slate-200 text-slate-800 rounded-bl-none shadow-sm"
-                    }`}>
-                      {msg.role === "user" ? msg.content : <MarkdownRenderer content={msg.content} />}
-                    </div>
+                {chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center max-w-sm mx-auto">
+                    <MessageSquare className="w-10 h-10 text-purple-400 mb-2 animate-bounce" />
+                    <span className="font-bold text-slate-700">Ask the RAG Assistant</span>
+                    <p className="text-[11px] text-slate-450 mt-1 leading-relaxed">Ask scientific questions, query equations, or draft student reading guides. Context is automatically grounded in your uploaded textbook.</p>
                   </div>
-                ))}
+                ) : (
+                  chatMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed ${
+                        msg.role === "user" ? "bg-purple-600 text-white rounded-br-none" : "bg-white border border-slate-200 text-slate-800 rounded-bl-none shadow-sm"
+                      }`}>
+                        {msg.role === "user" ? msg.content : <MarkdownRenderer content={msg.content} />}
+                      </div>
+                    </div>
+                  ))
+                )}
                 {sendingMessage && (
                   <div className="flex justify-start">
                     <span className="p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-500 flex items-center gap-2 shadow-sm">
