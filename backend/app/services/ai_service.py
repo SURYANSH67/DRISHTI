@@ -55,8 +55,8 @@ class AIService:
         if self.gemini_enabled:
             try:
                 result = genai.embed_content(
-                    model="models/text-embedding-004",
-                    contents=text,
+                    model="models/gemini-embedding-001",
+                    content=text,
                     task_type="retrieval_document"
                 )
                 return result["embedding"]
