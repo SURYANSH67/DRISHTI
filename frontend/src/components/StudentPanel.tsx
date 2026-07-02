@@ -96,6 +96,7 @@ export default function StudentPanel({
   const [evalResult, setEvalResult] = useState<any>(null);
   const [useTextbookRef, setUseTextbookRef] = useState(false);
   const [evalQuestionPaperFile, setEvalQuestionPaperFile] = useState<File | null>(null);
+  const [selectedLibrarySubject, setSelectedLibrarySubject] = useState<string>("All");
 
   useEffect(() => {
     fetchStats();
@@ -518,70 +519,82 @@ export default function StudentPanel({
                 <p className="text-slate-400 text-xs">Your teacher hasn't uploaded any syllabus materials. Check back later.</p>
               </div>
             ) : (
-              <div className="space-y-8">
-                {/* Group books by subject */}
-                {Object.entries(
-                  books.reduce((acc, b) => {
-                    const subject = b.subject_name || "General";
-                    if (!acc[subject]) acc[subject] = [];
-                    acc[subject].push(b);
-                    return acc;
-                  }, {} as Record<string, BookOverview[]>)
-                ).map(([subject, subjectBooks]) => (
-                  <div key={subject} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-extrabold uppercase tracking-wide">
-                        {subject}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-bold">{subjectBooks.length} {subjectBooks.length === 1 ? "Book" : "Books"}</span>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {subjectBooks.map(b => (
-                        <div key={b.book_id} className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow space-y-3">
-                          <div className="flex items-start justify-between gap-3">
+              <div className="space-y-6">
+                {/* Horizontal Subject Filtering Pills */}
+                <div className="flex flex-wrap gap-1.5 pb-2">
+                  {["All", ...Array.from(new Set(books.map(b => b.subject_name || "General")))].map(sub => (
+                    <button
+                      key={sub}
+                      onClick={() => setSelectedLibrarySubject(sub)}
+                      className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                        selectedLibrarySubject === sub
+                          ? "bg-purple-600 border-purple-650 text-white shadow-sm"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                      }`}
+                    >
+                      {sub.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Unified grid layout for properly arranged library cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                  {books
+                    .filter(b => selectedLibrarySubject === "All" || (b.subject_name || "General") === selectedLibrarySubject)
+                    .map(b => {
+                      const subjectBadge = b.subject_name || "General";
+                      return (
+                        <div key={b.book_id} className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-900/40 rounded-lg text-[9px] font-extrabold uppercase tracking-wide">
+                                {subjectBadge}
+                              </span>
+                              <a
+                                href={api.getBookDownloadUrl(b.book_id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-[9px] transition-colors cursor-pointer"
+                              >
+                                <Download className="w-2.5 h-2.5" />
+                                Download PDF
+                              </a>
+                            </div>
+
                             <div className="flex items-start gap-3 min-w-0">
                               <Book className="w-8 h-8 text-purple-600 shrink-0 mt-0.5" />
                               <div className="min-w-0">
-                                <h4 className="font-bold text-sm text-slate-800 truncate">{b.filename}</h4>
+                                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate" title={b.filename}>{b.filename}</h4>
                                 {b.uploaded_by && (
-                                  <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">Uploaded by Faculty</span>
+                                  <span className="text-[9px] text-slate-400 font-semibold block mt-0.5">Uploaded by Faculty</span>
                                 )}
                               </div>
                             </div>
-                            <a
-                              href={api.getBookDownloadUrl(b.book_id)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-[10px] transition-colors cursor-pointer shadow shadow-purple-600/10 shrink-0"
-                            >
-                              <Download className="w-3 h-3" />
-                              Download PDF
-                            </a>
                           </div>
 
-                          <div className="grid grid-cols-4 gap-2 text-center">
-                            <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg">
-                              <span className="text-[8px] text-slate-400 font-bold block uppercase">Pages</span>
-                              <span className="text-xs font-extrabold text-slate-800 block">{b.total_pages}</span>
+                          <div className="grid grid-cols-4 gap-1.5 text-center">
+                            <div className="p-1.5 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/40 rounded-lg">
+                              <span className="text-[7px] text-slate-400 font-bold block uppercase tracking-tight">Pages</span>
+                              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{b.total_pages}</span>
                             </div>
-                            <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg">
-                              <span className="text-[8px] text-slate-400 font-bold block uppercase">Chapters</span>
-                              <span className="text-xs font-extrabold text-slate-800 block">{b.chapters.length}</span>
+                            <div className="p-1.5 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/40 rounded-lg">
+                              <span className="text-[7px] text-slate-400 font-bold block uppercase tracking-tight">Chapters</span>
+                              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{b.chapters.length}</span>
                             </div>
-                            <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg">
-                              <span className="text-[8px] text-slate-400 font-bold block uppercase">Formulas</span>
-                              <span className="text-xs font-extrabold text-slate-800 block">{b.formula_count}</span>
+                            <div className="p-1.5 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/40 rounded-lg">
+                              <span className="text-[7px] text-slate-400 font-bold block uppercase tracking-tight">Formulas</span>
+                              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{b.formula_count}</span>
                             </div>
-                            <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg">
-                              <span className="text-[8px] text-slate-400 font-bold block uppercase">Diagrams</span>
-                              <span className="text-xs font-extrabold text-slate-800 block">{b.image_count}</span>
+                            <div className="p-1.5 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/40 rounded-lg">
+                              <span className="text-[7px] text-slate-400 font-bold block uppercase tracking-tight">Diagrams</span>
+                              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{b.image_count}</span>
                             </div>
                           </div>
 
                           {b.chapters.length > 0 && (
-                            <div className="border-t border-slate-100 pt-2 space-y-1.5">
+                            <div className="border-t border-slate-100 dark:border-slate-800/60 pt-3 space-y-1.5">
                               <span className="text-[9px] font-bold text-slate-400 uppercase block">Chapter Index</span>
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1">
                                 {b.chapters.map((ch, idx) => (
                                   <button
                                     key={idx}
@@ -590,19 +603,18 @@ export default function StudentPanel({
                                       setSelectedChapterNum(idx + 1);
                                       setActiveTab("tutor");
                                     }}
-                                    className="px-2 py-0.5 bg-slate-100 hover:bg-purple-50 hover:text-purple-700 border border-slate-200 hover:border-purple-200 rounded text-[9px] text-slate-600 font-bold transition-colors cursor-pointer"
+                                    className="px-2 py-0.5 bg-slate-105 hover:bg-purple-50 hover:text-purple-700 dark:bg-slate-800/40 dark:hover:bg-purple-950/20 dark:hover:text-purple-300 border border-slate-200 dark:border-slate-800/60 hover:border-purple-200 dark:hover:border-purple-800 rounded text-[9px] text-slate-600 dark:text-slate-350 font-bold transition-colors cursor-pointer"
                                   >
-                                    Ch {idx + 1}: {ch.title.length > 22 ? ch.title.substring(0, 22) + "…" : ch.title}
+                                    Ch {idx + 1}: {ch.title.length > 18 ? ch.title.substring(0, 18) + "…" : ch.title}
                                   </button>
                                 ))}
                               </div>
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                      );
+                    })}
+                </div>
               </div>
             )}
           </div>
