@@ -1,6 +1,6 @@
-# 🛡️ DRISHTI: Educational Intelligence Command Center
-### Defence Research Intelligent Study & Hybrid Tutoring Interface
-DRISHTI is an enterprise-grade, hybrid LLM + RAG Educational Intelligence Platform designed for structured and specialized curriculum training (e.g., Defence Research, Engineering, Science). It integrates advanced semantic document parsing, adaptive evaluation, dynamic assessment generation, and AI-grounded tutoring into a unified, information-dense SaaS Command Center.
+# 🛡️ DRISHTI AI: Educational Intelligence Command Center
+### Defence Research Intelligent Study, Tutoring & Hybrid Intelligence
+DRISHTI AI is an enterprise-grade, hybrid LLM + RAG Educational Intelligence Platform designed for structured and specialized curriculum training (e.g., Defence Research, Engineering, Science). It integrates advanced semantic document parsing, adaptive evaluation, dynamic assessment generation, and AI-grounded tutoring into a unified, information-dense SaaS Command Center.
 
 ---
 

@@ -120,7 +120,7 @@ export default function AdminPanel({
             className="w-10 h-10 object-contain drop-shadow" 
           />
           <div>
-            <h1 className="text-lg font-extrabold text-slate-800 dark:text-white leading-none">DRISHTI</h1>
+            <h1 className="text-lg font-extrabold text-slate-800 dark:text-white leading-none">DRISHTI AI</h1>
             <span className="text-[10px] text-purple-650 dark:text-purple-400 font-extrabold tracking-wide uppercase mt-0.5 block">Admin Panel</span>
           </div>
         </div>

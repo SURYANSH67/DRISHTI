@@ -105,10 +105,10 @@ export default function AuthView({ onAuthSuccess, theme, toggleTheme }: AuthView
             className="w-20 h-20 mx-auto object-contain mb-3 drop-shadow-md" 
           />
           <h2 className="text-2xl font-extrabold text-slate-800">
-            DRISHTI
+            DRISHTI AI
           </h2>
           <p className="text-slate-500 text-[11px] mt-1 font-semibold">
-            Defence Research Intelligent Study & Hybrid Tutoring Interface
+            Defence Research Intelligent Study, Tutoring & Hybrid Intelligence
           </p>
         </div>
 

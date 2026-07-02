@@ -8,8 +8,8 @@ from app.routers import books, tutor, generator, dashboard, auth, admin
 from app.database import setup_database
 
 app = FastAPI(
-    title="DRISHTI Framework API",
-    description="Defence Research Intelligent Study and Hybrid Tutoring Interface",
+    title="DRISHTI AI Framework API",
+    description="Defence Research Intelligent Study, Tutoring & Hybrid Intelligence",
     version="1.0.0"
 )
 

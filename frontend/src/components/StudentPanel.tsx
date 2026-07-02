@@ -258,7 +258,7 @@ export default function StudentPanel({
             />
             {!sidebarCollapsed && (
               <div className="min-w-0 transition-opacity duration-300">
-                <h1 className="text-lg font-extrabold text-slate-800 leading-none truncate">DRISHTI</h1>
+                <h1 className="text-lg font-extrabold text-slate-800 leading-none truncate">DRISHTI AI</h1>
                 <span className="text-[10px] text-purple-600 font-extrabold tracking-wide uppercase mt-0.5 block truncate">Student Panel</span>
               </div>
             )}
