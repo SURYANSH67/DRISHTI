@@ -241,7 +241,7 @@ export const api = {
   },
 
   async evaluateAnswer(
-    question: string,
+    question?: string,
     referenceAnswer?: string,
     studentAnswerText?: string,
     userId?: string,
@@ -250,7 +250,9 @@ export const api = {
     chapterNumber?: number
   ): Promise<EvaluationResponse> {
     const formData = new FormData();
-    formData.append("question", question);
+    if (question) {
+      formData.append("question", question);
+    }
     if (referenceAnswer) {
       formData.append("reference_answer", referenceAnswer);
     }

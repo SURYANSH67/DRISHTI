@@ -204,12 +204,28 @@ export default function StudentPanel({
 
   const handleEvaluateAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!evalQuestion.trim() || (!useTextbookRef && !evalRefAnswer.trim())) return;
+    
+    const hasQuestion = !!evalQuestion.trim();
+    const hasRefAnswer = useTextbookRef ? true : !!evalRefAnswer.trim();
+    const hasStudentResponse = !!evalFile || !!evalStudentText.trim();
+    
+    if (useTextbookRef) {
+      if (!hasStudentResponse) {
+        alert("Please upload a student answer sheet or type a student response to evaluate.");
+        return;
+      }
+    } else {
+      if (!hasQuestion || !hasRefAnswer || !hasStudentResponse) {
+        alert("Please fill in the Question Prompt, Reference Answer Key, and provide a student response.");
+        return;
+      }
+    }
+
     setEvaluating(true);
     setEvalResult(null);
     try {
       const result = await api.evaluateAnswer(
-        evalQuestion,
+        evalQuestion.trim() || undefined,
         useTextbookRef ? undefined : evalRefAnswer,
         evalStudentText || undefined,
         user.id,
