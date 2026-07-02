@@ -12,6 +12,7 @@ class BookOverview(BaseModel):
     formula_count: int
     table_count: int
     uploaded_by: str = ""
+    approved: int = 0
 
 # Chat schemas
 class ChatMessage(BaseModel):

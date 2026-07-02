@@ -183,22 +183,23 @@ async def list_books(user_role: Optional[str] = Query(None)):
     cursor = conn.cursor()
     
     if user_role == "Student":
-        cursor.execute("SELECT book_id FROM books WHERE approved = 1")
+        cursor.execute("SELECT book_id, approved FROM books WHERE approved = 1")
     else:
-        cursor.execute("SELECT book_id FROM books")
+        cursor.execute("SELECT book_id, approved FROM books")
         
     book_rows = cursor.fetchall()
     conn.close()
     
-    book_ids = [row["book_id"] for row in book_rows]
+    book_approved_map = {row["book_id"]: row["approved"] for row in book_rows}
     books = []
     
-    for book_id in book_ids:
+    for book_id, approved_status in book_approved_map.items():
         meta_path = get_book_metadata_path(book_id)
         if os.path.exists(meta_path):
             try:
                 with open(meta_path, "r") as f:
                     meta = json.load(f)
+                    meta["approved"] = approved_status
                     books.append(BookOverview(**meta))
             except Exception as e:
                 print(f"Error loading book metadata {book_id}: {e}")
@@ -210,8 +211,18 @@ async def get_book(book_id: str):
     meta_path = get_book_metadata_path(book_id)
     if not os.path.exists(meta_path):
         raise HTTPException(status_code=404, detail="Book metadata not found.")
+    
+    # Fetch approved status from database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT approved FROM books WHERE book_id = ?", (book_id,))
+    row = cursor.fetchone()
+    approved_status = row["approved"] if row else 0
+    conn.close()
+    
     with open(meta_path, "r") as f:
         meta = json.load(f)
+        meta["approved"] = approved_status
     return BookOverview(**meta)
 
 @router.get("/{book_id}/download")
