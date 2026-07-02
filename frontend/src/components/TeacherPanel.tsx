@@ -153,6 +153,7 @@ export default function TeacherPanel({
   const [evalFile, setEvalFile] = useState<File | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [evalResult, setEvalResult] = useState<any>(null);
+  const [useTextbookRef, setUseTextbookRef] = useState(false);
 
   const handleBookUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,13 +331,13 @@ export default function TeacherPanel({
 
   const handleEvaluateAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!evalQuestion.trim() || !evalRefAnswer.trim()) return;
+    if (!evalQuestion.trim() || (!useTextbookRef && !evalRefAnswer.trim())) return;
     setEvaluating(true);
     setEvalResult(null);
     try {
       const result = await api.evaluateAnswer(
         evalQuestion,
-        evalRefAnswer,
+        useTextbookRef ? undefined : evalRefAnswer,
         evalStudentText || undefined,
         user.id,
         evalFile || undefined,
@@ -1431,10 +1432,35 @@ export default function TeacherPanel({
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Question prompt</label>
                   <textarea value={evalQuestion} onChange={(e) => setEvalQuestion(e.target.value)} placeholder="Question prompt..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required />
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Model answer key</label>
-                  <textarea value={evalRefAnswer} onChange={(e) => setEvalRefAnswer(e.target.value)} placeholder="Reference answer..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required />
-                </div>
+                {selectedBookId && (
+                  <div className="flex items-center justify-between p-2.5 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-xl">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-purple-755 dark:text-purple-300">Textbook RAG Auto-Grading</span>
+                      <span className="text-[9px] text-slate-500 leading-tight">Use active textbook as the reference answer key.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={useTextbookRef}
+                        onChange={(e) => setUseTextbookRef(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                  </div>
+                )}
+
+                {!useTextbookRef ? (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Model answer key</label>
+                    <textarea value={evalRefAnswer} onChange={(e) => setEvalRefAnswer(e.target.value)} placeholder="Reference answer..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required />
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800/60 rounded-xl text-[10px] text-slate-500 font-semibold leading-relaxed">
+                    ℹ️ Reference answer will be automatically retrieved by querying the textbook: 
+                    <span className="text-purple-650 dark:text-purple-400 font-bold block mt-0.5 truncate">{selectedBook?.filename || "Active Textbook"}</span>
+                  </div>
+                )}
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Upload student handwriting copy</label>
                   <input type="file" onChange={(e) => setEvalFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-650 bg-white p-2 border border-slate-200 rounded-xl" />

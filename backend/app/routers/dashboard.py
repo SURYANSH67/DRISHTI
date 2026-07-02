@@ -113,7 +113,7 @@ async def log_quiz_attempt(
 @router.post("/evaluate", response_model=EvaluationResponse)
 async def evaluate_student_answer(
     question: str = Form(...),
-    reference_answer: str = Form(...),
+    reference_answer: Optional[str] = Form(None),
     student_answer_text: Optional[str] = Form(None),
     user_id: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
@@ -134,6 +134,26 @@ async def evaluate_student_answer(
                 shutil.copyfileobj(file.file, buffer)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save student answer upload: {e}")
+
+    # Auto-retrieve model reference answer from textbook if not provided
+    if not reference_answer or not reference_answer.strip():
+        if book_id:
+            try:
+                emb_query = ai_service.get_embedding(question)
+                meta_filter = {"book_id": book_id}
+                if chapter_number and chapter_number > 0:
+                    meta_filter["chapter_number"] = chapter_number
+                
+                matches = vector_store.search(emb_query, k=5, filter_metadata=meta_filter)
+                if matches:
+                    reference_answer = "\n\n".join([m["text"] for m in matches])
+                else:
+                    reference_answer = "[System Warning: No matching textbook content found in database.]"
+            except Exception as context_err:
+                print(f"Error querying textbook context for grading: {context_err}")
+                reference_answer = "[System Warning: Failed to retrieve textbook context from database.]"
+        else:
+            reference_answer = "[System Warning: No reference answer key or textbook syllabus context was provided.]"
 
     try:
         # Run vision OCR and grading completion
