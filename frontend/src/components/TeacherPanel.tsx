@@ -776,36 +776,48 @@ export default function TeacherPanel({
                 </div>
                 
                 <div className="grid grid-cols-4 gap-3 py-1.5 text-center text-xs">
-                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                  <div className="p-1.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl">
                     <span className="text-[8px] text-slate-400 font-bold block uppercase">Cohort Mean</span>
-                    <span className="text-sm font-bold text-purple-755 mt-0.5 block">84.5%</span>
+                    <span className="text-sm font-bold text-purple-755 dark:text-purple-450 mt-0.5 block">{stats?.cohort_mean ?? "--"}</span>
                   </div>
-                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                  <div className="p-1.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl">
                     <span className="text-[8px] text-slate-400 font-bold block uppercase">Highest</span>
-                    <span className="text-sm font-bold text-emerald-700 mt-0.5 block">98.2%</span>
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 block">{stats?.highest_score ?? "--"}</span>
                   </div>
-                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                  <div className="p-1.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl">
                     <span className="text-[8px] text-slate-400 font-bold block uppercase">Lowest</span>
-                    <span className="text-sm font-bold text-red-650 mt-0.5 block">61.0%</span>
+                    <span className="text-sm font-bold text-red-650 dark:text-red-400 mt-0.5 block">{stats?.lowest_score ?? "--"}</span>
                   </div>
-                  <div className="p-1.5 bg-slate-50 border border-slate-200/50 rounded-xl">
+                  <div className="p-1.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/60 rounded-xl">
                     <span className="text-[8px] text-slate-400 font-bold block uppercase">Needs Help</span>
-                    <span className="text-sm font-bold text-amber-700 mt-0.5 block">12 Students</span>
+                    <span className="text-sm font-bold text-amber-700 dark:text-amber-400 mt-0.5 block">
+                      {stats?.needs_help_count !== undefined 
+                        ? (stats.needs_help_count === 1 ? "1 Student" : `${stats.needs_help_count} Students`) 
+                        : "--"}
+                    </span>
                   </div>
                 </div>
 
                 <div className="space-y-1 pb-1">
                   <div className="flex items-center gap-0.5 h-5 rounded-lg overflow-hidden border border-slate-200/40 text-[9px] font-bold text-white text-center">
-                    <div className="bg-emerald-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "31%" }} title="Grade A">A (31%)</div>
-                    <div className="bg-purple-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "41%" }} title="Grade B">B (41%)</div>
-                    <div className="bg-blue-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "20%" }} title="Grade C">C (20%)</div>
-                    <div className="bg-amber-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: "8%" }} title="Grade D">D (8%)</div>
+                    <div className="bg-emerald-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: `${stats?.grade_pcts?.A ?? 31}%` }} title="Grade A">
+                      A ({stats?.grade_pcts?.A ?? 31}%)
+                    </div>
+                    <div className="bg-purple-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: `${stats?.grade_pcts?.B ?? 41}%` }} title="Grade B">
+                      B ({stats?.grade_pcts?.B ?? 41}%)
+                    </div>
+                    <div className="bg-blue-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: `${stats?.grade_pcts?.C ?? 20}%` }} title="Grade C">
+                      C ({stats?.grade_pcts?.C ?? 20}%)
+                    </div>
+                    <div className="bg-amber-500 h-full flex items-center justify-center transition-all hover:opacity-90 cursor-pointer" style={{ width: `${stats?.grade_pcts?.D ?? 8}%` }} title="Grade D">
+                      D ({stats?.grade_pcts?.D ?? 8}%)
+                    </div>
                   </div>
                   <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase pt-1">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Grade A (48)</span>
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span> Grade B (64)</span>
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> Grade C (32)</span>
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Grade D (12)</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Grade A ({stats?.grade_counts?.A ?? 0})</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span> Grade B ({stats?.grade_counts?.B ?? 0})</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> Grade C ({stats?.grade_counts?.C ?? 0})</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Grade D ({stats?.grade_counts?.D ?? 0})</span>
                   </div>
                 </div>
               </div>
