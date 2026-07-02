@@ -1430,7 +1430,7 @@ export default function TeacherPanel({
               <form onSubmit={handleEvaluateAnswer} className="space-y-3">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Question prompt</label>
-                  <textarea value={evalQuestion} onChange={(e) => setEvalQuestion(e.target.value)} placeholder="Question prompt..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required />
+                  <textarea value={evalQuestion} onChange={(e) => setEvalQuestion(e.target.value)} placeholder={useTextbookRef ? "Question prompt (Optional - AI will auto-detect from submission)..." : "Question prompt..."} rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required={!useTextbookRef} />
                 </div>
                 {selectedBookId && (
                   <div className="flex items-center justify-between p-2.5 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-xl">

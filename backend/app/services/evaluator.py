@@ -2,19 +2,22 @@ import os
 import json
 from typing import Dict, Any, Optional
 from app.services.ai_service import ai_service
+from app.services.vector_store import vector_store
 import fitz # PyMuPDF
 
 class AnswerEvaluator:
     @staticmethod
     def evaluate(
-        question: str, 
-        reference_answer: str, 
+        question: Optional[str] = None, 
+        reference_answer: Optional[str] = None, 
         student_answer_text: Optional[str] = None, 
-        student_answer_file_path: Optional[str] = None
+        student_answer_file_path: Optional[str] = None,
+        book_id: Optional[str] = None,
+        chapter_number: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Evaluates a student's answer against a reference answer.
-        Supports direct text input, PDF file uploads, or Image file uploads (for handwritten answers).
+        Evaluates a student's answer sheet.
+        Supports standard grading or autonomous RAG auto-grading (if question or reference_answer is omitted).
         """
         extracted_text = ""
         is_image = False
@@ -33,16 +36,114 @@ class AnswerEvaluator:
                     extracted_text = "[Failed to parse PDF content]"
             elif ext in [".png", ".jpg", ".jpeg", ".webp"]:
                 is_image = True
+                # Perform OCR on the image to get text for RAG retrieval
+                try:
+                    extracted_text = ai_service.analyze_image(
+                        student_answer_file_path,
+                        "Perform raw handwriting OCR on this student's response. Return only the extracted text exactly as written, with no explanations, formatting or notes."
+                    )
+                except Exception as e:
+                    print(f"OCR image preprocessing failed: {e}")
+                    extracted_text = "[Failed to run OCR on student handwriting]"
             else:
-                # Text/DOCX fallback (read raw text if possible, assuming txt)
+                # Text/DOCX fallback
                 try:
                     with open(student_answer_file_path, "r", encoding="utf-8") as f:
                         extracted_text = f.read()
                 except Exception as e:
                     print(f"Error reading student text file: {e}")
 
-        # 2. Build AI prompts
-        evaluation_prompt = f"""
+        # Determine auto-detect mode
+        is_auto_detect = not question or not question.strip() or question.strip().lower() == "auto-detected"
+        
+        if is_auto_detect:
+            # Set default values
+            question = "Auto-Detected Questions from uploaded answer sheet"
+            query_text = (extracted_text or student_answer_text or "").strip()
+            
+            # Query vector store with concepts from student answer text
+            if query_text:
+                try:
+                    emb_query = ai_service.get_embedding(query_text[:800])
+                    meta_filter = {"book_id": book_id} if book_id else {}
+                    if chapter_number and chapter_number > 0:
+                        meta_filter["chapter_number"] = chapter_number
+                    
+                    matches = vector_store.search(emb_query, k=6, filter_metadata=meta_filter)
+                    if matches:
+                        reference_answer = "\n\n".join([m["text"] for m in matches])
+                    else:
+                        reference_answer = "[No relevant textbook context found for the concepts in the student answer sheet.]"
+                except Exception as e:
+                    print(f"Error doing RAG auto-detect textbook search: {e}")
+                    reference_answer = "[Failed to retrieve textbook context from database.]"
+            else:
+                reference_answer = "[No student text or answers found in submission to query textbook syllabus.]"
+        
+        elif not reference_answer or not reference_answer.strip():
+            # Question is provided, but reference answer is missing. Retrieve it using the question as query
+            if book_id:
+                try:
+                    emb_query = ai_service.get_embedding(question)
+                    meta_filter = {"book_id": book_id}
+                    if chapter_number and chapter_number > 0:
+                        meta_filter["chapter_number"] = chapter_number
+                    
+                    matches = vector_store.search(emb_query, k=5, filter_metadata=meta_filter)
+                    if matches:
+                        reference_answer = "\n\n".join([m["text"] for m in matches])
+                    else:
+                        reference_answer = "[No matching textbook content found in database.]"
+                except Exception as e:
+                    print(f"Error retrieving textbook context for question: {e}")
+                    reference_answer = "[Failed to retrieve textbook context from database.]"
+            else:
+                reference_answer = "[No reference answer key or textbook syllabus context was provided.]"
+
+        # 2. Build AI prompts based on mode
+        if is_auto_detect:
+            evaluation_prompt = f"""
+You are an expert academic evaluator. The student has uploaded a handwritten answer sheet, and we want to grade it against their textbook.
+We have extracted the student's handwritten answer text:
+---
+{extracted_text or student_answer_text or "[Empty student submission]"}
+---
+
+And we have retrieved the matching reference sections from their textbook:
+---
+{reference_answer}
+---
+
+Evaluate the student's submission by doing the following:
+1. Identify all individual questions/topics/problems the student has written answers for in their text.
+2. Grade the student's answer to each of these topics out of 10 based on technical correctness, completeness, and accuracy against the textbook reference.
+3. Combine these individual scores into a single overall score out of 10 for the entire sheet.
+4. List all missing elements (critical keywords, equations, formulas) they should have included.
+5. List specific mistakes or misconceptions found in their answers.
+6. Provide actionable suggestions pointing to textbook concepts/sections they should review.
+7. Pedagogical insights:
+   - List key concepts they successfully answered (`concepts_correct`).
+   - List key concepts they missed or got wrong (`concepts_missed`).
+   - Calculate a similarity score (0.0 to 1.0) between their answers and reference.
+
+You MUST return your response as a valid JSON object matching this structure EXACTLY:
+{{
+  "handwriting_ocr_text": "extracted text",
+  "score": 8, // Integer out of 10
+  "concept_accuracy": "brief description (e.g. High, Medium, Low)",
+  "missing_elements": ["list of missing keywords, formulas, or diagrams"],
+  "mistakes": ["list of errors, math mistakes, or misconceptions found"],
+  "suggestions": "actionable feedback telling them exactly what textbook topics, sections, or formulas they missed and how to fix it",
+  "overall_feedback": "encouraging general summary of performance",
+  "concepts_correct": ["list of correct concepts"],
+  "concepts_missed": ["list of missed concepts"],
+  "similarity_score": 0.8,
+  "improved_explanation": null, // Keep null for auto-detect mode
+  "confidence_score": 0.0
+}}
+"""
+        else:
+            evaluation_prompt = f"""
 Evaluate the student's answer to the question below. Compare it with the reference answer.
 
 Question:
@@ -52,7 +153,7 @@ Reference Answer:
 {reference_answer}
 
 {f"Student Answer (Extracted text):" if not is_image else ""}
-{extracted_text if not is_image else "The student's answer is uploaded as the attached image containing handwriting. Perform handwriting OCR and extract the answer text."}
+{extracted_text or student_answer_text or "The student's answer is uploaded as the attached image containing handwriting. Perform handwriting OCR and extract the answer text."}
 
 Evaluate the response strictly based on the following:
 1. Marks: Award a score out of 10.
@@ -119,6 +220,10 @@ You MUST return your response as a valid JSON object matching this structure EXA
                 parsed["improved_explanation"] = None
             if "confidence_score" not in parsed:
                 parsed["confidence_score"] = 0.0
+            if is_image and ("handwriting_ocr_text" not in parsed or not parsed["handwriting_ocr_text"] or parsed["handwriting_ocr_text"] == "extracted text"):
+                parsed["handwriting_ocr_text"] = extracted_text
+            elif is_auto_detect and ("handwriting_ocr_text" not in parsed or not parsed["handwriting_ocr_text"] or parsed["handwriting_ocr_text"] == "extracted text"):
+                parsed["handwriting_ocr_text"] = extracted_text
 
             return parsed
         except Exception as e:
