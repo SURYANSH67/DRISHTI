@@ -155,6 +155,20 @@ export default function TeacherPanel({
   const [evalResult, setEvalResult] = useState<any>(null);
   const [useTextbookRef, setUseTextbookRef] = useState(false);
   const [evalQuestionPaperFile, setEvalQuestionPaperFile] = useState<File | null>(null);
+  const [stats, setStats] = useState<any>(null);
+
+  const loadStatsData = async () => {
+    try {
+      const data = await api.getDashboardStats(user.id);
+      setStats(data);
+    } catch (err) {
+      console.error("Error loading stats:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadStatsData();
+  }, [books]);
 
   const handleBookUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,6 +377,7 @@ export default function TeacherPanel({
         evalQuestionPaperFile || undefined
       );
       setEvalResult(result);
+      loadStatsData();
     } catch (err) {
       alert("Grading process failed.");
     } finally {
@@ -728,21 +743,21 @@ export default function TeacherPanel({
 
               {/* Row 2: 8 Statistics Cards in two rows of four (col-span-3 each) */}
               {[
-                { title: "Books", val: books.length, icon: <Book className="w-3.5 h-3.5 text-blue-500" />, desc: "PDFs Loaded" },
+                { title: "Books", val: stats?.book_count ?? books.length, icon: <Book className="w-3.5 h-3.5 text-blue-500" />, desc: "PDFs Loaded" },
                 { title: "Chapters", val: totalChapters, icon: <Database className="w-3.5 h-3.5 text-purple-500" />, desc: "Indexed Units" },
-                { title: "Students", val: books.length > 0 ? 45 : 0, icon: <User className="w-3.5 h-3.5 text-emerald-500" />, desc: "Registered" },
-                { title: "AI Chats", val: books.length > 0 ? 180 : 0, icon: <MessageSquare className="w-3.5 h-3.5 text-pink-500" />, desc: "Resolved" },
-                { title: "Papers", val: books.length > 0 ? 6 : 0, icon: <FileText className="w-3.5 h-3.5 text-indigo-500" />, desc: "Compiled Sheets" },
-                { title: "Assessments", val: books.length > 0 ? 14 : 0, icon: <Camera className="w-3.5 h-3.5 text-amber-500" />, desc: "OCR Graded" },
-                { title: "Avg Score", val: books.length > 0 ? "84.5%" : "--", icon: <BarChart2 className="w-3.5 h-3.5 text-sky-500" />, desc: "Class Mean" },
-                { title: "Accuracy", val: books.length > 0 ? "96%" : "--", icon: <Award className="w-3.5 h-3.5 text-red-500" />, desc: "OCR Extract" },
+                { title: "Students", val: stats?.student_count ?? 0, icon: <User className="w-3.5 h-3.5 text-emerald-500" />, desc: "Registered" },
+                { title: "AI Chats", val: stats?.ai_chats_count ?? 0, icon: <MessageSquare className="w-3.5 h-3.5 text-pink-500" />, desc: "Resolved" },
+                { title: "Papers", val: stats?.papers_count ?? 0, icon: <FileText className="w-3.5 h-3.5 text-indigo-500" />, desc: "Compiled Sheets" },
+                { title: "Assessments", val: stats?.assessments_count ?? 0, icon: <Camera className="w-3.5 h-3.5 text-amber-500" />, desc: "OCR Graded" },
+                { title: "Avg Score", val: stats?.class_avg_score ?? "--", icon: <BarChart2 className="w-3.5 h-3.5 text-sky-500" />, desc: "Class Mean" },
+                { title: "Accuracy", val: stats?.ocr_accuracy ?? "--", icon: <Award className="w-3.5 h-3.5 text-red-500" />, desc: "OCR Extract" },
               ].map((c, i) => (
-                <div key={i} className="col-span-6 lg:col-span-3 glass-panel p-3 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-between gap-2.5 h-[68px] hover:scale-[1.01] transition-transform duration-200">
+                <div key={i} className="col-span-6 lg:col-span-3 glass-panel p-3 rounded-2xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-800 shadow-sm flex items-center justify-between gap-2.5 h-[68px] hover:scale-[1.01] transition-transform duration-250">
                   <div className="min-w-0">
                     <span className="text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider truncate">{c.title}</span>
-                    <span className="text-base font-extrabold text-slate-800 mt-0.5 block leading-none">{c.val}</span>
+                    <span className="text-base font-extrabold text-slate-800 dark:text-slate-100 mt-0.5 block leading-none">{c.val}</span>
                   </div>
-                  <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-100 shrink-0">
+                  <div className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-850 border border-slate-100 dark:border-slate-800 shrink-0">
                     {c.icon}
                   </div>
                 </div>
