@@ -118,7 +118,8 @@ async def evaluate_student_answer(
     user_id: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     book_id: Optional[str] = Form(None),
-    chapter_number: Optional[int] = Form(None)
+    chapter_number: Optional[int] = Form(None),
+    question_paper_file: Optional[UploadFile] = File(None)
 ):
     """
     Grades a student's answer using OCR and multimodal LLM logic.
@@ -135,6 +136,17 @@ async def evaluate_student_answer(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save student answer upload: {e}")
 
+    question_paper_path = None
+    if question_paper_file:
+        qp_id = uuid.uuid4().hex[:8]
+        qp_filename = question_paper_file.filename or f"qp_{qp_id}.pdf"
+        question_paper_path = str(settings.UPLOAD_DIR / f"qp_{qp_id}_{qp_filename}")
+        try:
+            with open(question_paper_path, "wb") as buffer:
+                shutil.copyfileobj(question_paper_file.file, buffer)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save question paper upload: {e}")
+
     try:
         # Run vision OCR and grading completion
         result = evaluator.evaluate(
@@ -143,7 +155,8 @@ async def evaluate_student_answer(
             student_answer_text=student_answer_text,
             student_answer_file_path=file_path,
             book_id=book_id,
-            chapter_number=chapter_number
+            chapter_number=chapter_number,
+            question_paper_file_path=question_paper_path
         )
         
         timestamp = datetime.now().isoformat()
@@ -157,7 +170,7 @@ async def evaluate_student_answer(
                 cursor.execute("""
                 INSERT INTO evaluations (id, user_id, question, score, concept_accuracy, feedback, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (eval_id, user_id, question[:150], result["score"], result["concept_accuracy"], result["overall_feedback"], timestamp))
+                """, (eval_id, user_id, (question or "Auto-Detected Sheet")[:150], result["score"], result["concept_accuracy"], result["overall_feedback"], timestamp))
                 conn.commit()
             except Exception as db_err:
                 print(f"Error logging grading assessment to SQLite: {db_err}")

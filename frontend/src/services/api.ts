@@ -247,7 +247,8 @@ export const api = {
     userId?: string,
     file?: File,
     bookId?: string,
-    chapterNumber?: number
+    chapterNumber?: number,
+    questionPaperFile?: File
   ): Promise<EvaluationResponse> {
     const formData = new FormData();
     if (question) {
@@ -270,6 +271,9 @@ export const api = {
     }
     if (chapterNumber !== undefined && chapterNumber !== null) {
       formData.append("chapter_number", String(chapterNumber));
+    }
+    if (questionPaperFile) {
+      formData.append("question_paper_file", questionPaperFile);
     }
 
     const res = await fetch(`${API_BASE_URL}/dashboard/evaluate`, {

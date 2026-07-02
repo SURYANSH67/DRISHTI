@@ -154,6 +154,7 @@ export default function TeacherPanel({
   const [evaluating, setEvaluating] = useState(false);
   const [evalResult, setEvalResult] = useState<any>(null);
   const [useTextbookRef, setUseTextbookRef] = useState(false);
+  const [evalQuestionPaperFile, setEvalQuestionPaperFile] = useState<File | null>(null);
 
   const handleBookUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,11 +333,11 @@ export default function TeacherPanel({
   const handleEvaluateAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const hasQuestion = !!evalQuestion.trim();
+    const hasQuestion = !!evalQuestion.trim() || !!evalQuestionPaperFile;
     const hasRefAnswer = useTextbookRef ? true : !!evalRefAnswer.trim();
     const hasStudentResponse = !!evalFile || !!evalStudentText.trim();
     
-    if (useTextbookRef) {
+    if (useTextbookRef || evalQuestionPaperFile) {
       if (!hasStudentResponse) {
         alert("Please upload a student answer sheet or type a student response to evaluate.");
         return;
@@ -358,7 +359,8 @@ export default function TeacherPanel({
         user.id,
         evalFile || undefined,
         selectedBookId || undefined,
-        selectedChapterNum || undefined
+        selectedChapterNum || undefined,
+        evalQuestionPaperFile || undefined
       );
       setEvalResult(result);
     } catch (err) {
@@ -1446,7 +1448,19 @@ export default function TeacherPanel({
               <form onSubmit={handleEvaluateAnswer} className="space-y-3">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Question prompt</label>
-                  <textarea value={evalQuestion} onChange={(e) => setEvalQuestion(e.target.value)} placeholder={useTextbookRef ? "Question prompt (Optional - AI will auto-detect from submission)..." : "Question prompt..."} rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" required={!useTextbookRef} />
+                  <textarea 
+                    value={evalQuestion} 
+                    onChange={(e) => setEvalQuestion(e.target.value)} 
+                    placeholder={
+                      evalQuestionPaperFile 
+                        ? `Questions will be automatically extracted from: ${evalQuestionPaperFile.name}`
+                        : (useTextbookRef ? "Question prompt (Optional - AI will auto-detect from submission)..." : "Question prompt...")
+                    } 
+                    disabled={!!evalQuestionPaperFile}
+                    rows={2} 
+                    className="w-full glass-input p-3 rounded-xl text-xs bg-white disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-400" 
+                    required={!useTextbookRef && !evalQuestionPaperFile} 
+                  />
                 </div>
                 {selectedBookId && (
                   <div className="flex items-center justify-between p-2.5 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-xl">
@@ -1477,6 +1491,10 @@ export default function TeacherPanel({
                     <span className="text-purple-650 dark:text-purple-400 font-bold block mt-0.5 truncate">{selectedBook?.filename || "Active Textbook"}</span>
                   </div>
                 )}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Upload Question Paper (Optional)</label>
+                  <input type="file" onChange={(e) => setEvalQuestionPaperFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-650 bg-white p-2 border border-slate-200 rounded-xl" />
+                </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Upload student handwriting copy</label>
                   <input type="file" onChange={(e) => setEvalFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-650 bg-white p-2 border border-slate-200 rounded-xl" />

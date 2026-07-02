@@ -13,16 +13,17 @@ class AnswerEvaluator:
         student_answer_text: Optional[str] = None, 
         student_answer_file_path: Optional[str] = None,
         book_id: Optional[str] = None,
-        chapter_number: Optional[int] = None
+        chapter_number: Optional[int] = None,
+        question_paper_file_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Evaluates a student's answer sheet.
-        Supports standard grading or autonomous RAG auto-grading (if question or reference_answer is omitted).
+        Supports standard grading, auto-grading via textbook search, or auto-grading via uploaded question paper.
         """
         extracted_text = ""
         is_image = False
         
-        # 1. Handle file upload (Image vs PDF)
+        # 1. Handle student answer sheet file upload (Image vs PDF)
         if student_answer_file_path:
             ext = os.path.splitext(student_answer_file_path)[1].lower()
             if ext in [".pdf"]:
@@ -53,11 +54,54 @@ class AnswerEvaluator:
                 except Exception as e:
                     print(f"Error reading student text file: {e}")
 
-        # Determine auto-detect mode
-        is_auto_detect = not question or not question.strip() or question.strip().lower() == "auto-detected"
-        
-        if is_auto_detect:
-            # Set default values
+        # 2. Handle Question Paper file upload if provided
+        question_paper_text = ""
+        if question_paper_file_path:
+            qp_ext = os.path.splitext(question_paper_file_path)[1].lower()
+            if qp_ext in [".pdf"]:
+                try:
+                    doc = fitz.open(question_paper_file_path)
+                    question_paper_text = " ".join([page.get_text("text") for page in doc])
+                    doc.close()
+                except Exception as e:
+                    print(f"Error reading question paper PDF: {e}")
+            elif qp_ext in [".png", ".jpg", ".jpeg", ".webp"]:
+                try:
+                    question_paper_text = ai_service.analyze_image(
+                        question_paper_file_path,
+                        "Perform OCR on this question paper. Extract and list all questions clearly. Do not answer them."
+                    )
+                except Exception as e:
+                    print(f"Error reading question paper image: {e}")
+
+        # Set up auto-detect or RAG retrieval based on inputs
+        if question_paper_text:
+            # Overwrite question to use the extracted question paper
+            question = f"Questions from uploaded Question Paper:\n{question_paper_text}"
+            
+            # Retrieve model answers for the questions from the textbook
+            if book_id:
+                try:
+                    # Query textbook with a combination of the question paper topics and student answer concepts
+                    combined_query = (question_paper_text[:500] + "\n\n" + (extracted_text or student_answer_text or "")[:500]).strip()
+                    emb_query = ai_service.get_embedding(combined_query[:800])
+                    meta_filter = {"book_id": book_id}
+                    if chapter_number and chapter_number > 0:
+                        meta_filter["chapter_number"] = chapter_number
+                    
+                    matches = vector_store.search(emb_query, k=6, filter_metadata=meta_filter)
+                    if matches:
+                        reference_answer = "\n\n".join([m["text"] for m in matches])
+                    else:
+                        reference_answer = "[No matching textbook content found in database.]"
+                except Exception as e:
+                    print(f"Error retrieving textbook context for question paper: {e}")
+                    reference_answer = "[Failed to retrieve textbook context from database.]"
+            else:
+                reference_answer = "[No textbook active for grading syllabus context.]"
+
+        elif not question or not question.strip() or question.strip().lower() == "auto-detected":
+            # Auto-detect questions mode (no prompt, no question paper)
             question = "Auto-Detected Questions from uploaded answer sheet"
             query_text = (extracted_text or student_answer_text or "").strip()
             
@@ -81,7 +125,7 @@ class AnswerEvaluator:
                 reference_answer = "[No student text or answers found in submission to query textbook syllabus.]"
         
         elif not reference_answer or not reference_answer.strip():
-            # Question is provided, but reference answer is missing. Retrieve it using the question as query
+            # Question prompt is typed, but reference answer is missing. Retrieve it using the question prompt
             if book_id:
                 try:
                     emb_query = ai_service.get_embedding(question)
@@ -100,8 +144,58 @@ class AnswerEvaluator:
             else:
                 reference_answer = "[No reference answer key or textbook syllabus context was provided.]"
 
-        # 2. Build AI prompts based on mode
-        if is_auto_detect:
+        # 3. Build AI prompts based on whether we are grading a specific question paper
+        is_auto_detect = not question_paper_text and (not question or question.strip() == "Auto-Detected Questions from uploaded answer sheet")
+        
+        if question_paper_text:
+            evaluation_prompt = f"""
+You are an expert academic evaluator. The teacher has uploaded a Question Paper and the student's answer sheet.
+We want to grade the student's answers to the questions listed in the Question Paper against their textbook.
+
+Question Paper Text:
+---
+{question_paper_text}
+---
+
+Student's Answer Text (Handwritten/Typed):
+---
+{extracted_text or student_answer_text or "[Empty student submission]"}
+---
+
+And we have retrieved the matching reference sections from their textbook:
+---
+{reference_answer}
+---
+
+Evaluate the student's submission by doing the following:
+1. Extract and map each question from the Question Paper to the student's corresponding answer.
+2. Grade the student's answer to each question out of 10 based on technical correctness, completeness, and accuracy against the textbook reference.
+3. Combine these individual scores into a single overall score out of 10 for the entire sheet.
+4. List all missing elements (critical keywords, equations, formulas) they should have included.
+5. List specific mistakes or misconceptions found in their answers.
+6. Provide actionable suggestions pointing to textbook concepts/sections they should review.
+7. Pedagogical insights:
+   - List key concepts they successfully answered (`concepts_correct`).
+   - List key concepts they missed or got wrong (`concepts_missed`).
+   - Calculate a similarity score (0.0 to 1.0) between their answers and reference.
+
+You MUST return your response as a valid JSON object matching this structure EXACTLY:
+{{
+  "handwriting_ocr_text": "extracted text",
+  "score": 8, // Integer out of 10
+  "concept_accuracy": "brief description (e.g. High, Medium, Low)",
+  "missing_elements": ["list of missing keywords, formulas, or diagrams"],
+  "mistakes": ["list of errors, math mistakes, or misconceptions found"],
+  "suggestions": "actionable feedback telling them exactly what textbook topics, sections, or formulas they missed and how to fix it",
+  "overall_feedback": "encouraging general summary of performance",
+  "concepts_correct": ["list of correct concepts"],
+  "concepts_missed": ["list of missed concepts"],
+  "similarity_score": 0.8,
+  "improved_explanation": null,
+  "confidence_score": 0.0
+}}
+"""
+        elif is_auto_detect:
             evaluation_prompt = f"""
 You are an expert academic evaluator. The student has uploaded a handwritten answer sheet, and we want to grade it against their textbook.
 We have extracted the student's handwritten answer text:
@@ -138,7 +232,7 @@ You MUST return your response as a valid JSON object matching this structure EXA
   "concepts_correct": ["list of correct concepts"],
   "concepts_missed": ["list of missed concepts"],
   "similarity_score": 0.8,
-  "improved_explanation": null, // Keep null for auto-detect mode
+  "improved_explanation": null,
   "confidence_score": 0.0
 }}
 """
@@ -223,6 +317,8 @@ You MUST return your response as a valid JSON object matching this structure EXA
             if is_image and ("handwriting_ocr_text" not in parsed or not parsed["handwriting_ocr_text"] or parsed["handwriting_ocr_text"] == "extracted text"):
                 parsed["handwriting_ocr_text"] = extracted_text
             elif is_auto_detect and ("handwriting_ocr_text" not in parsed or not parsed["handwriting_ocr_text"] or parsed["handwriting_ocr_text"] == "extracted text"):
+                parsed["handwriting_ocr_text"] = extracted_text
+            elif question_paper_text and ("handwriting_ocr_text" not in parsed or not parsed["handwriting_ocr_text"] or parsed["handwriting_ocr_text"] == "extracted text"):
                 parsed["handwriting_ocr_text"] = extracted_text
 
             return parsed
