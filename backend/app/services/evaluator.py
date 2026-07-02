@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any, Optional
 from app.services.ai_service import ai_service
 from app.services.vector_store import vector_store
+from app.config import settings
 import fitz # PyMuPDF
 
 class AnswerEvaluator:
@@ -19,6 +20,7 @@ class AnswerEvaluator:
         """
         Evaluates a student's answer sheet.
         Supports standard grading, auto-grading via textbook search, or auto-grading via uploaded question paper.
+        If PDFs contain no digital text layer (scanned copies), runs visual OCR page-by-page.
         """
         extracted_text = ""
         is_image = False
@@ -30,7 +32,30 @@ class AnswerEvaluator:
                 # Extract text from PDF
                 try:
                     doc = fitz.open(student_answer_file_path)
-                    extracted_text = " ".join([page.get_text("text") for page in doc])
+                    extracted_text = " ".join([page.get_text("text") for page in doc]).strip()
+                    
+                    # Fallback to visual OCR if PDF is scanned (no text layer)
+                    if len(extracted_text) < 15:
+                        print("Student PDF has no text layer. Running visual OCR page-by-page...")
+                        ocr_pages = []
+                        for page in doc:
+                            pix = page.get_pixmap(dpi=150)
+                            temp_img_path = os.path.join(str(settings.UPLOAD_DIR), f"temp_ocr_{page.number}.png")
+                            pix.save(temp_img_path)
+                            try:
+                                page_text = ai_service.analyze_image(
+                                    temp_img_path,
+                                    "Perform raw handwriting OCR on this student's response page. Return only the extracted text exactly as written, with no explanations, formatting or notes."
+                                )
+                                if page_text:
+                                    ocr_pages.append(page_text)
+                            except Exception as ocr_err:
+                                print(f"Failed OCR on student answer page {page.number}: {ocr_err}")
+                            finally:
+                                if os.path.exists(temp_img_path):
+                                    os.remove(temp_img_path)
+                        extracted_text = "\n\n".join(ocr_pages).strip()
+                        
                     doc.close()
                 except Exception as e:
                     print(f"Error reading student PDF answer: {e}")
@@ -61,7 +86,30 @@ class AnswerEvaluator:
             if qp_ext in [".pdf"]:
                 try:
                     doc = fitz.open(question_paper_file_path)
-                    question_paper_text = " ".join([page.get_text("text") for page in doc])
+                    question_paper_text = " ".join([page.get_text("text") for page in doc]).strip()
+                    
+                    # Fallback to visual OCR if Question Paper PDF is scanned (no text layer)
+                    if len(question_paper_text) < 15:
+                        print("Question Paper PDF has no text layer. Running visual OCR page-by-page...")
+                        ocr_pages = []
+                        for page in doc:
+                            pix = page.get_pixmap(dpi=150)
+                            temp_img_path = os.path.join(str(settings.UPLOAD_DIR), f"temp_qp_ocr_{page.number}.png")
+                            pix.save(temp_img_path)
+                            try:
+                                page_text = ai_service.analyze_image(
+                                    temp_img_path,
+                                    "Perform OCR on this question paper page. Extract and list all questions clearly. Do not answer them."
+                                )
+                                if page_text:
+                                    ocr_pages.append(page_text)
+                            except Exception as ocr_err:
+                                print(f"Failed OCR on QP page {page.number}: {ocr_err}")
+                            finally:
+                                if os.path.exists(temp_img_path):
+                                    os.remove(temp_img_path)
+                        question_paper_text = "\n\n".join(ocr_pages).strip()
+                        
                     doc.close()
                 except Exception as e:
                     print(f"Error reading question paper PDF: {e}")
