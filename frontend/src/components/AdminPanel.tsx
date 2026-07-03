@@ -23,6 +23,7 @@ interface AdminPanelProps {
   onLogout: () => void;
   theme: string;
   toggleTheme: () => void;
+  networkStatus?: "online" | "offline";
 }
 
 type Tab = "users" | "books" | "telemetry";
@@ -33,7 +34,8 @@ export default function AdminPanel({
   fetchBooks,
   onLogout,
   theme,
-  toggleTheme
+  toggleTheme,
+  networkStatus
 }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("users");
 
@@ -122,6 +124,15 @@ export default function AdminPanel({
           <div>
             <h1 className="text-lg font-extrabold text-slate-800 dark:text-white leading-none">DRISHTI AI</h1>
             <span className="text-[10px] text-purple-650 dark:text-purple-400 font-extrabold tracking-wide uppercase mt-0.5 block">Admin Panel</span>
+            {networkStatus === "online" ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-extrabold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30 mt-1 max-w-max">
+                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span> Online
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-extrabold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30 mt-1 max-w-max">
+                <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span> Offline Mode
+              </span>
+            )}
           </div>
         </div>
 

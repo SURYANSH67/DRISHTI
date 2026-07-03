@@ -12,6 +12,7 @@ export default function App() {
   const [selectedBookId, setSelectedBookId] = useState<string>("");
   const [selectedChapterNum, setSelectedChapterNum] = useState<number | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [networkStatus, setNetworkStatus] = useState<"online" | "offline">("online");
 
   // Load authenticated user profile and theme settings on mount
   useEffect(() => {
@@ -35,6 +36,22 @@ export default function App() {
       document.documentElement.classList.toggle("dark", prefersDark);
     }
   }, []);
+
+  // Poll network status from the server
+  useEffect(() => {
+    if (!user) return;
+    const checkNetwork = async () => {
+      try {
+        const data = await api.getNetworkStatus();
+        setNetworkStatus(data.status);
+      } catch (err) {
+        setNetworkStatus("offline");
+      }
+    };
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Fetch available books database once logged in
   useEffect(() => {
@@ -91,6 +108,7 @@ export default function App() {
         onLogout={handleLogout}
         theme={theme}
         toggleTheme={toggleTheme}
+        networkStatus={networkStatus}
       />
     );
   }
@@ -109,6 +127,7 @@ export default function App() {
         onLogout={handleLogout}
         theme={theme}
         toggleTheme={toggleTheme}
+        networkStatus={networkStatus}
       />
     );
   }
@@ -125,6 +144,7 @@ export default function App() {
       onLogout={handleLogout}
       theme={theme}
       toggleTheme={toggleTheme}
+      networkStatus={networkStatus}
     />
   );
 }

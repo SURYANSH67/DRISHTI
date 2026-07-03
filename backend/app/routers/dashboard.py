@@ -7,10 +7,32 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from app.config import settings
 from app.schemas import EvaluationResponse
-from app.services.evaluator import evaluator
+from app.services.evaluator import evaluator, HAS_MACOS_VISION
+from app.services.ai_service import ai_service
 from app.database import get_db_connection
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+@router.get("/network-status")
+async def get_network_status():
+    is_online = False
+    try:
+        import socket
+        socket.setdefaulttimeout(1.0)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
+        is_online = True
+    except Exception:
+        pass
+        
+    return {
+        "status": "online" if is_online else "offline",
+        "details": {
+            "gemini_api": "enabled" if (is_online and ai_service.gemini_enabled) else "offline/disabled",
+            "groq_api": "enabled" if (is_online and ai_service.groq_client) else "offline/disabled",
+            "local_embeddings": "active" if ai_service.local_embedding_enabled else "disabled",
+            "local_ocr": "active" if HAS_MACOS_VISION else "disabled"
+        }
+    }
 
 @router.get("/stats")
 async def get_stats(user_id: str = Query(...)):
@@ -72,6 +94,69 @@ async def get_stats(user_id: str = Query(...)):
             scores.append(q_avg * 100.0)
         avg_score_val = round(sum(scores) / len(scores), 1) if scores else 0.0
 
+        # Calculate highest and lowest scores
+        cursor.execute("SELECT MAX(score) FROM evaluations")
+        max_eval = cursor.fetchone()[0]
+        cursor.execute("SELECT MAX(CAST(score AS REAL) / total) * 100 FROM quiz_attempts")
+        max_quiz = cursor.fetchone()[0]
+        max_scores = []
+        if max_eval is not None:
+            max_scores.append(max_eval * 10.0)
+        if max_quiz is not None:
+            max_scores.append(max_quiz)
+        highest_score_val = round(max(max_scores), 1) if max_scores else 0.0
+
+        cursor.execute("SELECT MIN(score) FROM evaluations")
+        min_eval = cursor.fetchone()[0]
+        cursor.execute("SELECT MIN(CAST(score AS REAL) / total) * 100 FROM quiz_attempts")
+        min_quiz = cursor.fetchone()[0]
+        min_scores = []
+        if min_eval is not None:
+            min_scores.append(min_eval * 10.0)
+        if min_quiz is not None:
+            min_scores.append(min_quiz)
+        lowest_score_val = round(min(min_scores), 1) if min_scores else 0.0
+
+        # Needs Help calculation (students with avg score < 70)
+        cursor.execute("""
+        SELECT id FROM users 
+        WHERE role = 'Student' AND (
+            id IN (
+                SELECT user_id FROM quiz_attempts 
+                GROUP BY user_id 
+                HAVING AVG(CAST(score AS REAL) / total) * 100 < 70
+            ) OR id IN (
+                SELECT user_id FROM evaluations 
+                GROUP BY user_id 
+                HAVING AVG(score) * 10 < 70
+            )
+        )
+        """)
+        needs_help_count = len(cursor.fetchall())
+
+        # Grade distribution
+        cursor.execute("SELECT score * 10.0 FROM evaluations")
+        eval_scores = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT (CAST(score AS REAL) / total) * 100.0 FROM quiz_attempts")
+        quiz_scores = [r[0] for r in cursor.fetchall()]
+        all_scores = eval_scores + quiz_scores
+
+        grade_counts = {"A": 0, "B": 0, "C": 0, "D": 0}
+        for s in all_scores:
+            if s >= 85:
+                grade_counts["A"] += 1
+            elif s >= 70:
+                grade_counts["B"] += 1
+            elif s >= 50:
+                grade_counts["C"] += 1
+            else:
+                grade_counts["D"] += 1
+
+        total_grades = len(all_scores)
+        grade_pcts = {}
+        for k, v in grade_counts.items():
+            grade_pcts[k] = round((v / total_grades) * 100) if total_grades > 0 else 0
+
         # Recent activities
         cursor.execute("""
         SELECT 'Quiz' as type, book_id, chapter_number, score, total, timestamp, '' as detail 
@@ -111,6 +196,21 @@ async def get_stats(user_id: str = Query(...)):
         if q_avg is not None:
             scores.append(q_avg * 100.0)
         avg_score_val = round(sum(scores) / len(scores), 1) if scores else 0.0
+        highest_score_val = avg_score_val
+        lowest_score_val = avg_score_val
+        needs_help_count = 0 if avg_score_val >= 70 else 1
+
+        grade_counts = {"A": 0, "B": 0, "C": 0, "D": 0}
+        if avg_score_val >= 85:
+            grade_counts["A"] = 1
+        elif avg_score_val >= 70:
+            grade_counts["B"] = 1
+        elif avg_score_val >= 50:
+            grade_counts["C"] = 1
+        elif avg_score_val > 0:
+            grade_counts["D"] = 1
+
+        grade_pcts = {k: (100 if v > 0 else 0) for k, v in grade_counts.items()}
 
         # Recent activities
         cursor.execute("""
@@ -158,7 +258,14 @@ async def get_stats(user_id: str = Query(...)):
         "papers_count": papers_count,
         "assessments_count": total_assessments,
         "class_avg_score": f"{avg_score_val}%" if avg_score_val > 0 else "--",
-        "ocr_accuracy": "96.4%" if total_assessments > 0 else "--"
+        "ocr_accuracy": "96.4%" if total_assessments > 0 else "--",
+        # Extra Cohort telemetry
+        "cohort_mean": f"{avg_score_val}%" if avg_score_val > 0 else "--",
+        "highest_score": f"{highest_score_val}%" if highest_score_val > 0 else "--",
+        "lowest_score": f"{lowest_score_val}%" if lowest_score_val > 0 else "--",
+        "needs_help_count": needs_help_count,
+        "grade_counts": grade_counts,
+        "grade_pcts": grade_pcts
     }
 
 @router.post("/log-quiz")

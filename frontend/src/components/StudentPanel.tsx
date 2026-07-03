@@ -30,6 +30,7 @@ interface StudentPanelProps {
   onLogout: () => void;
   theme: string;
   toggleTheme: () => void;
+  networkStatus?: "online" | "offline";
 }
 
 type Tab = "dashboard" | "library" | "tutor" | "study-hub" | "quiz" | "grader";
@@ -43,7 +44,8 @@ export default function StudentPanel({
   setSelectedChapterNum,
   onLogout,
   theme,
-  toggleTheme
+  toggleTheme,
+  networkStatus
 }: StudentPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -260,6 +262,15 @@ export default function StudentPanel({
               <div className="min-w-0 transition-opacity duration-300">
                 <h1 className="text-lg font-extrabold text-slate-800 leading-none truncate">DRISHTI AI</h1>
                 <span className="text-[10px] text-purple-600 font-extrabold tracking-wide uppercase mt-0.5 block truncate">Student Panel</span>
+                {networkStatus === "online" ? (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-extrabold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30 mt-1 max-w-max">
+                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span> Online
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-extrabold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30 mt-1 max-w-max">
+                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span> Offline Mode
+                  </span>
+                )}
               </div>
             )}
           </div>

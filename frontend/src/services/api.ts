@@ -218,6 +218,12 @@ export const api = {
     return res.json();
   },
 
+  async getNetworkStatus(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/dashboard/network-status`);
+    if (!res.ok) throw new Error("Failed to fetch network status");
+    return res.json();
+  },
+
   async logQuizAttempt(
     userId: string,
     bookId: string,
