@@ -49,8 +49,18 @@ class AIService:
             except Exception as e:
                 print(f"Error configuring Gemini: {e}")
 
+        # Attempt to support SentenceTransformer locally for offline embeddings
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.sentence_transformer_class = SentenceTransformer
+            self.local_embedding_enabled = True
+        except ImportError:
+            self.local_embedding_enabled = False
+            self.sentence_transformer_class = None
+        self.local_embedding_model = None
+
     def get_embedding(self, text: str) -> List[float]:
-        """Generate text embedding using Gemini (primary) or OpenAI (fallback)."""
+        """Generate text embedding using Gemini (primary), OpenAI (fallback), or local SentenceTransformer."""
         # 1. Try Gemini Embeddings
         if self.gemini_enabled:
             try:
@@ -74,8 +84,20 @@ class AIService:
             except Exception as e:
                 print(f"OpenAI embedding failed: {e}")
 
-        # 3. Fallback dummy embedding
-        return [0.0] * 1536
+        # 3. Try Local Offline Embeddings using SentenceTransformer
+        if self.local_embedding_enabled:
+            try:
+                if self.local_embedding_model is None:
+                    print("Initializing local SentenceTransformer (all-MiniLM-L6-v2) for offline embeddings...")
+                    self.local_embedding_model = self.sentence_transformer_class("all-MiniLM-L6-v2")
+                emb = self.local_embedding_model.encode(text)
+                return [float(x) for x in emb]
+            except Exception as e:
+                print(f"Local SentenceTransformer embedding failed: {e}")
+
+        # 4. Fallback dummy embedding
+        dim = 384 if self.local_embedding_enabled else 1536
+        return [0.0] * dim
 
     def chat_completion(
         self, 

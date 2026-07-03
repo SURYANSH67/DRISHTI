@@ -1,10 +1,55 @@
 import os
 import json
+import sys
 from typing import Dict, Any, Optional
 from app.services.ai_service import ai_service
 from app.services.vector_store import vector_store
 from app.config import settings
 import fitz # PyMuPDF
+
+# Try importing macOS native libraries for offline OCR
+HAS_MACOS_VISION = False
+if sys.platform == "darwin":
+    try:
+        import objc
+        from Cocoa import NSURL
+        from Vision import VNImageRequestHandler, VNRecognizeTextRequest
+        HAS_MACOS_VISION = True
+        print("macOS native Vision OCR framework initialized successfully.")
+    except Exception as e:
+        print(f"macOS Vision imports failed: {e}. PyObjC bindings might not be configured.")
+
+def run_local_offline_ocr(image_path: str) -> Optional[str]:
+    """Run local hardware-accelerated handwriting OCR on macOS using Apple's Vision API."""
+    if not HAS_MACOS_VISION:
+        return None
+        
+    try:
+        url = NSURL.fileURLWithPath_(image_path)
+        request = VNRecognizeTextRequest.alloc().init()
+        request.setRecognitionLevel_(0) # 0 = Accurate, 1 = Fast
+        request.setUsesLanguageCorrection_(True)
+        
+        handler = VNImageRequestHandler.alloc().initWithURL_options_(url, None)
+        success, error = handler.performRequests_error_([request], None)
+        if not success:
+            print(f"macOS Vision request failed: {error}")
+            return None
+            
+        results = request.results()
+        text_lines = []
+        for result in results:
+            candidates = result.topCandidates_(1)
+            if candidates:
+                text_lines.append(candidates[0].string())
+                
+        extracted = "\n".join(text_lines).strip()
+        if extracted:
+            print(f"macOS Vision OCR successfully extracted {len(extracted)} chars offline.")
+        return extracted
+    except Exception as e:
+        print(f"macOS Vision OCR execution failed: {e}")
+        return None
 
 class AnswerEvaluator:
     @staticmethod
@@ -43,10 +88,16 @@ class AnswerEvaluator:
                             temp_img_path = os.path.join(str(settings.UPLOAD_DIR), f"temp_ocr_{page.number}.png")
                             pix.save(temp_img_path)
                             try:
-                                page_text = ai_service.analyze_image(
-                                    temp_img_path,
-                                    "Perform raw handwriting OCR on this student's response page. Return only the extracted text exactly as written, with no explanations, formatting or notes."
-                                )
+                                # Try local offline OCR first
+                                page_text = run_local_offline_ocr(temp_img_path)
+                                
+                                # Online fallback
+                                if not page_text:
+                                    print("Local offline OCR fallback unavailable. Trying online vision API...")
+                                    page_text = ai_service.analyze_image(
+                                        temp_img_path,
+                                        "Perform raw handwriting OCR on this student's response page. Return only the extracted text exactly as written, with no explanations, formatting or notes."
+                                    )
                                 if page_text:
                                     ocr_pages.append(page_text)
                             except Exception as ocr_err:
@@ -64,10 +115,16 @@ class AnswerEvaluator:
                 is_image = True
                 # Perform OCR on the image to get text for RAG retrieval
                 try:
-                    extracted_text = ai_service.analyze_image(
-                        student_answer_file_path,
-                        "Perform raw handwriting OCR on this student's response. Return only the extracted text exactly as written, with no explanations, formatting or notes."
-                    )
+                    # Try local offline OCR first
+                    extracted_text = run_local_offline_ocr(student_answer_file_path)
+                    
+                    # Online fallback
+                    if not extracted_text:
+                        print("Local offline OCR fallback unavailable. Trying online vision API...")
+                        extracted_text = ai_service.analyze_image(
+                            student_answer_file_path,
+                            "Perform raw handwriting OCR on this student's response. Return only the extracted text exactly as written, with no explanations, formatting or notes."
+                        )
                 except Exception as e:
                     print(f"OCR image preprocessing failed: {e}")
                     extracted_text = "[Failed to run OCR on student handwriting]"
@@ -97,10 +154,16 @@ class AnswerEvaluator:
                             temp_img_path = os.path.join(str(settings.UPLOAD_DIR), f"temp_qp_ocr_{page.number}.png")
                             pix.save(temp_img_path)
                             try:
-                                page_text = ai_service.analyze_image(
-                                    temp_img_path,
-                                    "Perform OCR on this question paper page. Extract and list all questions clearly. Do not answer them."
-                                )
+                                # Try local offline OCR first
+                                page_text = run_local_offline_ocr(temp_img_path)
+                                
+                                # Online fallback
+                                if not page_text:
+                                    print("Local offline OCR fallback unavailable. Trying online vision API...")
+                                    page_text = ai_service.analyze_image(
+                                        temp_img_path,
+                                        "Perform OCR on this question paper page. Extract and list all questions clearly. Do not answer them."
+                                    )
                                 if page_text:
                                     ocr_pages.append(page_text)
                             except Exception as ocr_err:
@@ -115,10 +178,16 @@ class AnswerEvaluator:
                     print(f"Error reading question paper PDF: {e}")
             elif qp_ext in [".png", ".jpg", ".jpeg", ".webp"]:
                 try:
-                    question_paper_text = ai_service.analyze_image(
-                        question_paper_file_path,
-                        "Perform OCR on this question paper. Extract and list all questions clearly. Do not answer them."
-                    )
+                    # Try local offline OCR first
+                    question_paper_text = run_local_offline_ocr(question_paper_file_path)
+                    
+                    # Online fallback
+                    if not question_paper_text:
+                        print("Local offline OCR fallback unavailable. Trying online vision API...")
+                        question_paper_text = ai_service.analyze_image(
+                            question_paper_file_path,
+                            "Perform OCR on this question paper. Extract and list all questions clearly. Do not answer them."
+                        )
                 except Exception as e:
                     print(f"Error reading question paper image: {e}")
 

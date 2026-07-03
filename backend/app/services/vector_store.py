@@ -96,7 +96,7 @@ class SimpleVectorStore:
                 continue
 
             doc_emb = doc["embedding"]
-            if not doc_emb:
+            if not doc_emb or len(doc_emb) != len(query_embedding):
                 continue
                 
             # Dot product
