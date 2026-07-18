@@ -104,6 +104,7 @@ class QuestionPaperGenerateRequest(BaseModel):
     ai_options: Optional[List[str]] = None
 
 class QuestionPaperResponse(BaseModel):
+    id: str
     title: str
     content: str
     metadata: Dict[str, Any]

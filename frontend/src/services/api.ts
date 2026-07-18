@@ -191,7 +191,7 @@ export const api = {
     autoDistribute: boolean,
     customDistribution?: Record<string, number>,
     aiOptions?: string[]
-  ): Promise<{ title: string; content: string; metadata: any }> {
+  ): Promise<{ id: string; title: string; content: string; metadata: any }> {
     const res = await fetch(`${API_BASE_URL}/generator/paper`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -247,16 +247,23 @@ export const api = {
     return res.json();
   },
 
-  async convertPaperToGoogleForm(paperId: string): Promise<any> {
+  async convertPaperToGoogleForm(paperId: string, appsScriptUrl?: string): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/google-form`, {
-      method: "POST"
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ apps_script_url: appsScriptUrl })
     });
     if (!res.ok) throw new Error("Failed to convert paper to Google Form");
     return res.json();
   },
 
-  async getFormResponses(paperId: string): Promise<any[]> {
-    const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/responses`);
+  async getFormResponses(paperId: string, appsScriptUrl?: string): Promise<any[]> {
+    const url = appsScriptUrl 
+      ? `${API_BASE_URL}/generator/papers/${paperId}/responses?apps_script_url=${encodeURIComponent(appsScriptUrl)}` 
+      : `${API_BASE_URL}/generator/papers/${paperId}/responses`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error("Failed to fetch Google Form student responses");
     return res.json();
   },
