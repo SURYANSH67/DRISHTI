@@ -13,6 +13,7 @@ Welcome to the official **DRISHTI AI** Project Handbook. This document provides 
 5. [Frontend Components & Style System](#5-frontend-components--style-system)
 6. [Offline Pipeline & Local Fallbacks](#6-offline-pipeline--local-fallbacks)
 7. [Deployment & Shareability Guides](#7-deployment--shareability-guides)
+8. [DRDO Presentation Reference & Side-by-Side Pipeline Comparison](#8-drdo-presentation-reference--side-by-side-pipeline-comparison)
 
 ---
 
@@ -261,3 +262,13 @@ To expose the unified port `8000` to the internet without installing local softw
 ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -R 80:localhost:8000 a.pinggy.io
 ```
 This returns a public HTTPS domain (e.g. `https://xxxxx.run.pinggy-free.link`) that anyone can open to access the application.
+
+---
+
+## 8. DRDO Presentation Reference & Side-by-Side Pipeline Comparison
+
+For complete details on the comparative analysis, diagrams, and sample question case study, please refer to the dedicated **[DRISHTI_DRDO_COMPARISON_REPORT.md](file:///Users/suryanshdixit/Downloads/aiii/DRISHTI_DRDO_COMPARISON_REPORT.md)** document. It provides:
+1. **Parallel RAG Architecture flow diagram** demonstrating how only the AI service nodes (OCR, Embedding, and LLM generation) alter between online/offline models.
+2. **Comparison Matrix Scorecard** detailing latency parameters (Apple OCR running 5.6x faster than cloud equivalents), context token limits, and answer relevance.
+3. **Deadlock Case Study transcripts** demonstrating that local execution (using Llama 3.2 via Ollama) provides highly accurate, air-gapped responses with zero data leakage risks.
+
