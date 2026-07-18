@@ -14,11 +14,13 @@ import {
   Download,
   Menu,
   Sun,
-  Moon
+  Moon,
+  Layers
 } from "lucide-react";
 import { api } from "../services/api";
 import type { BookOverview, ChatMessage, ContextSource, QuizQuestion } from "../services/api";
 import MarkdownRenderer from "./MarkdownRenderer";
+import PipelineSandbox from "./PipelineSandbox";
 
 interface StudentPanelProps {
   user: any;
@@ -33,7 +35,7 @@ interface StudentPanelProps {
   networkStatus?: "online" | "offline";
 }
 
-type Tab = "dashboard" | "library" | "tutor" | "study-hub" | "quiz" | "grader";
+type Tab = "dashboard" | "library" | "tutor" | "study-hub" | "quiz" | "grader" | "sandbox";
 
 export default function StudentPanel({
   user,
@@ -365,6 +367,16 @@ export default function StudentPanel({
           >
             <Camera className="w-4 h-4 shrink-0" />
             {!sidebarCollapsed && <span>Written Evaluations</span>}
+          </button>
+          <button
+            onClick={() => setActiveTab("sandbox")}
+            title="Pipeline Sandbox"
+            className={`w-full flex items-center ${sidebarCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"} rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "sandbox" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Layers className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Pipeline Sandbox</span>}
           </button>
         </nav>
 
@@ -891,7 +903,7 @@ export default function StudentPanel({
                 )}
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Upload Question Paper (Optional)</label>
-                  <input type="file" onChange={(e) => setEvalQuestionPaperFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-650 bg-white p-2 border border-slate-200 rounded-xl" />
+                  <input type="file" onChange={(e) => setEvalQuestionPaperFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-655 bg-white p-2 border border-slate-200 rounded-xl" />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Upload student handwriting copy</label>
@@ -901,7 +913,7 @@ export default function StudentPanel({
                   <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase">Or type response</label>
                   <textarea value={evalStudentText} onChange={(e) => setEvalStudentText(e.target.value)} placeholder="Type student answer..." rows={2} className="w-full glass-input p-3 rounded-xl text-xs bg-white" />
                 </div>
-                <button type="submit" disabled={evaluating} className="w-full py-3 bg-purple-600 hover:bg-purple-750 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors">
+                <button type="submit" disabled={evaluating} className="w-full py-3 bg-purple-600 hover:bg-purple-755 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors">
                   {evaluating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Evaluate submission"}
                 </button>
               </form>
@@ -934,6 +946,15 @@ export default function StudentPanel({
               )}
             </div>
           </div>
+        )}
+
+        {/* Pipeline Sandbox comparison dashboard */}
+        {activeTab === "sandbox" && (
+          <PipelineSandbox 
+            books={books}
+            selectedBookId={selectedBookId}
+            selectedChapterNum={selectedChapterNum}
+          />
         )}
       </main>
     </div>

@@ -20,11 +20,13 @@ import {
   Download,
   Menu,
   Sun,
-  Moon
+  Moon,
+  Layers
 } from "lucide-react";
 import { api } from "../services/api";
 import type { BookOverview } from "../services/api";
 import MarkdownRenderer from "./MarkdownRenderer";
+import PipelineSandbox from "./PipelineSandbox";
 
 interface TeacherPanelProps {
   user: any;
@@ -40,7 +42,7 @@ interface TeacherPanelProps {
   networkStatus?: "online" | "offline";
 }
 
-type Tab = "dashboard" | "knowledge-base" | "chat" | "question-gen" | "grading" | "knowledge" | "analytics" | "settings";
+type Tab = "dashboard" | "knowledge-base" | "chat" | "question-gen" | "grading" | "knowledge" | "analytics" | "settings" | "sandbox";
 
 const EXAM_TYPES = ["Mid Semester", "End Semester", "Unit Test", "Practice Test", "Custom"];
 const PATTERNS = ["Standard (Balanced)", "University Pattern", "CBSE Pattern", "Competitive Exam", "Custom Pattern"];
@@ -595,6 +597,17 @@ export default function TeacherPanel({
           >
             <Settings className="w-4 h-4 shrink-0" />
             {!sidebarCollapsed && <span>Settings</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("sandbox")}
+            title="Pipeline Sandbox"
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === "sandbox" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/15" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+            }`}
+          >
+            <Layers className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && <span>Pipeline Sandbox</span>}
           </button>
         </nav>
 
@@ -1228,6 +1241,15 @@ export default function TeacherPanel({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Pipeline Sandbox tab */}
+        {activeTab === "sandbox" && (
+          <PipelineSandbox 
+            books={books}
+            selectedBookId={selectedBookId}
+            selectedChapterNum={selectedChapterNum}
+          />
         )}
 
         {/* Question generator */}
