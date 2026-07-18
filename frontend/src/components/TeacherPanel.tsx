@@ -1733,14 +1733,14 @@ export default function TeacherPanel({
                               {paper.google_form_url ? (
                                 <>
                                   <a 
-                                    href={paper.google_form_url} 
+                                    href={paper.google_form_url.startsWith("http") ? paper.google_form_url : window.location.origin + paper.google_form_url} 
                                     target="_blank" 
                                     rel="noreferrer" 
                                     onClick={(e) => e.stopPropagation()} 
                                     className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
                                   >
                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    Google Form Link
+                                    {paper.google_form_url.startsWith("http") ? "Google Form Link" : "Interactive Mock Form"}
                                   </a>
                                   <button
                                     onClick={(e) => {

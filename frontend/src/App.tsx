@@ -3,6 +3,7 @@ import AuthView from "./components/AuthView";
 import StudentPanel from "./components/StudentPanel";
 import TeacherPanel from "./components/TeacherPanel";
 import AdminPanel from "./components/AdminPanel";
+import MockFormView from "./components/MockFormView";
 import { api } from "./services/api";
 import type { BookOverview } from "./services/api";
 
@@ -92,6 +93,13 @@ export default function App() {
     setSelectedBookId("");
     setSelectedChapterNum(null);
   };
+
+  // 0. Intercept local Mock Form student submission pages (requires no login)
+  const path = window.location.pathname;
+  if (path.startsWith("/mock-form/")) {
+    const paperId = path.split("/")[2];
+    return <MockFormView paperId={paperId} />;
+  }
 
   // 1. If not logged in, redirect to authentication (Login / Registration)
   if (!user) {
