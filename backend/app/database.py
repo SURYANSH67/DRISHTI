@@ -108,6 +108,34 @@ def setup_database():
         timestamp TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
+    # 7. Question papers table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS question_papers (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        metadata TEXT NOT NULL,
+        google_form_url TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # 8. Google Form Responses and AI Grading Evaluations table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS form_responses (
+        id TEXT PRIMARY KEY,
+        paper_id TEXT NOT NULL,
+        student_name TEXT NOT NULL,
+        submission_time TEXT NOT NULL,
+        overall_percentage REAL NOT NULL,
+        marks_obtained INTEGER NOT NULL,
+        total_marks INTEGER NOT NULL,
+        ai_feedback TEXT,
+        question_analysis TEXT NOT NULL,
+        FOREIGN KEY(paper_id) REFERENCES question_papers(id)
+    )
+    """)
     
     # Insert default Administrator if not exists
     cursor.execute("SELECT id FROM users WHERE role = 'Administrator'")

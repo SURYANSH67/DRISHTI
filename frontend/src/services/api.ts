@@ -1,4 +1,6 @@
-const API_BASE_URL = `http://${window.location.hostname}:8000/api`;
+const API_BASE_URL = window.location.port === "5173" || window.location.port === "5174"
+  ? `http://${window.location.hostname}:8000/api`
+  : `${window.location.origin}/api`;
 
 export interface BookOverview {
   book_id: string;
@@ -221,6 +223,52 @@ export const api = {
   async getNetworkStatus(): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/dashboard/network-status`);
     if (!res.ok) throw new Error("Failed to fetch network status");
+    return res.json();
+  },
+
+  async comparePipelines(question: string, bookId?: string, chapterNumber?: number): Promise<any> {
+    const formData = new FormData();
+    formData.append("question", question);
+    if (bookId) formData.append("book_id", bookId);
+    if (chapterNumber !== undefined && chapterNumber !== null) {
+      formData.append("chapter_number", chapterNumber.toString());
+    }
+    const res = await fetch(`${API_BASE_URL}/dashboard/compare`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) throw new Error("Failed to execute pipeline comparison");
+    return res.json();
+  },
+
+  async getQuestionPapers(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/generator/papers`);
+    if (!res.ok) throw new Error("Failed to fetch question papers");
+    return res.json();
+  },
+
+  async convertPaperToGoogleForm(paperId: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/google-form`, {
+      method: "POST"
+    });
+    if (!res.ok) throw new Error("Failed to convert paper to Google Form");
+    return res.json();
+  },
+
+  async getFormResponses(paperId: string): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/responses`);
+    if (!res.ok) throw new Error("Failed to fetch Google Form student responses");
+    return res.json();
+  },
+
+  async overrideResponseScore(responseId: string, marksObtained: number): Promise<any> {
+    const formData = new FormData();
+    formData.append("marks_obtained", marksObtained.toString());
+    const res = await fetch(`${API_BASE_URL}/generator/responses/${responseId}/override`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) throw new Error("Failed to update score override");
     return res.json();
   },
 

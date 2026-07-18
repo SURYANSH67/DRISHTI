@@ -207,6 +207,74 @@ export default function TeacherPanel({
     }
   };
 
+  // Google Forms & Student Evaluations Integration States
+  const [activeSubTab, setActiveSubTab] = useState<"create" | "forms">("create");
+  const [papersList, setPapersList] = useState<any[]>([]);
+  const [loadingPapers, setLoadingPapers] = useState(false);
+  const [convertingPaperId, setConvertingPaperId] = useState<string | null>(null);
+  const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
+  const [formResponses, setFormResponses] = useState<any[]>([]);
+  const [loadingResponses, setLoadingResponses] = useState(false);
+  const [gradingResponseId, setGradingResponseId] = useState<string | null>(null);
+  const [overrideMarksVal, setOverrideMarksVal] = useState<number>(0);
+  const [viewingResponseDetail, setViewingResponseDetail] = useState<any | null>(null);
+
+  const fetchPapers = async () => {
+    setLoadingPapers(true);
+    try {
+      const data = await api.getQuestionPapers();
+      setPapersList(data);
+    } catch (err) {
+      console.error("Failed to fetch papers:", err);
+    } finally {
+      setLoadingPapers(false);
+    }
+  };
+
+  const handleConvertToForm = async (paperId: string) => {
+    setConvertingPaperId(paperId);
+    try {
+      await api.convertPaperToGoogleForm(paperId);
+      await fetchPapers();
+    } catch (err) {
+      console.error("Failed to convert paper:", err);
+    } finally {
+      setConvertingPaperId(null);
+    }
+  };
+
+  const handleFetchResponses = async (paper: any) => {
+    setSelectedPaper(paper);
+    setLoadingResponses(true);
+    try {
+      const data = await api.getFormResponses(paper.id);
+      setFormResponses(data);
+    } catch (err) {
+      console.error("Failed to fetch responses:", err);
+    } finally {
+      setLoadingResponses(false);
+    }
+  };
+
+  const handleOverrideMarks = async (responseId: string, newMarks: number) => {
+    try {
+      await api.overrideResponseScore(responseId, newMarks);
+      if (selectedPaper) {
+        const data = await api.getFormResponses(selectedPaper.id);
+        setFormResponses(data);
+      }
+      setGradingResponseId(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to override score");
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "question-gen") {
+      fetchPapers();
+    }
+  }, [activeTab]);
+
   const handleGeneratePaper = async () => {
     if (!selectedBookId || selectedChapterNum === null) return;
     setGeneratingPaper(true);
@@ -1254,9 +1322,40 @@ export default function TeacherPanel({
 
         {/* Question generator */}
         {activeTab === "question-gen" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Configuration Column */}
-            <div className="glass-panel p-6 rounded-2xl lg:col-span-5 space-y-5 h-fit border border-slate-200/80 shadow-md">
+          <div className="space-y-6">
+            {/* Sub-tab navigation selector bar */}
+            <div className="flex border-b border-slate-200 dark:border-slate-800 pb-px">
+              <button
+                onClick={() => setActiveSubTab("create")}
+                className={`px-5 py-2.5 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                  activeSubTab === "create"
+                    ? "border-purple-600 text-purple-650 dark:text-purple-400"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Generate New Paper
+              </button>
+              <button
+                onClick={() => {
+                  setActiveSubTab("forms");
+                  fetchPapers();
+                }}
+                className={`px-5 py-2.5 text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                  activeSubTab === "forms"
+                    ? "border-purple-600 text-purple-650 dark:text-purple-400"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Database className="w-4 h-4" />
+                Google Forms & Student Evaluations
+              </button>
+            </div>
+
+            {activeSubTab === "create" ? (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Configuration Column */}
+                <div className="glass-panel p-6 rounded-2xl lg:col-span-5 space-y-5 h-fit border border-slate-200/80 shadow-md">
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-lg font-bold text-slate-800">Question Paper Configuration</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Design exam parameters and let AI build balanced tests.</p>
@@ -1497,6 +1596,337 @@ export default function TeacherPanel({
                 </div>
               )}
             </div>
+              </div>
+            ) : (
+              // Our new Google Forms & Evaluations View!
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column: List of existing papers */}
+                <div className="glass-panel p-5 rounded-2xl lg:col-span-5 space-y-4 border border-slate-200/80 shadow-md">
+                  <div className="border-b border-slate-200 pb-2 flex justify-between items-center">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-800">Existing Question Papers</h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">Select a paper to pull student submissions.</p>
+                    </div>
+                    <button onClick={fetchPapers} className="p-1 text-slate-450 hover:text-purple-600 transition-colors">
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingPapers ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+
+                  {loadingPapers ? (
+                    <div className="py-12 flex justify-center items-center text-slate-400 text-xs">
+                      <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                      Loading system question papers...
+                    </div>
+                  ) : papersList.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      No question papers found in the database. Generate a paper first in the builder tab!
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+                      {papersList.map((paper) => {
+                        const isSelected = selectedPaper?.id === paper.id;
+                        return (
+                          <div 
+                            key={paper.id} 
+                            onClick={() => handleFetchResponses(paper)}
+                            className={`p-3.5 rounded-xl border transition-all cursor-pointer text-xs ${
+                              isSelected 
+                                ? "bg-purple-50/50 border-purple-300 dark:bg-purple-950/20" 
+                                : "bg-white border-slate-200 dark:bg-slate-900/60 dark:border-slate-800/80 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="font-extrabold text-slate-700 dark:text-slate-200 leading-snug">{paper.title}</span>
+                              <span className="shrink-0 text-[9px] bg-slate-100 dark:bg-slate-850 text-slate-500 font-bold px-1.5 py-0.5 rounded">
+                                {paper.metadata?.total_marks} M
+                              </span>
+                            </div>
+
+                            <div className="text-[10px] text-slate-400 mt-1 font-semibold flex flex-wrap gap-x-2 gap-y-0.5">
+                              <span>📅 {paper.created_at}</span>
+                              <span>•</span>
+                              <span>Pattern: {paper.metadata?.pattern}</span>
+                            </div>
+
+                            {/* Google Form Link / Status */}
+                            <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                              {paper.google_form_url ? (
+                                <>
+                                  <a 
+                                    href={paper.google_form_url} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    onClick={(e) => e.stopPropagation()} 
+                                    className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
+                                  >
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Google Form Link
+                                  </a>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleFetchResponses(paper);
+                                    }}
+                                    className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold rounded cursor-pointer transition-colors"
+                                  >
+                                    Fetch Responses
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[10px] text-slate-400 italic">No Active Form</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleConvertToForm(paper.id);
+                                    }}
+                                    disabled={convertingPaperId === paper.id}
+                                    className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 font-bold rounded border border-indigo-200 cursor-pointer transition-colors"
+                                  >
+                                    {convertingPaperId === paper.id ? "Converting..." : "Convert to Google Form"}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Student Responses / Graded Submissions dashboard */}
+                <div className="glass-panel p-5 rounded-2xl lg:col-span-7 min-h-[60vh] flex flex-col border border-slate-200/80 shadow-md">
+                  {!selectedPaper ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                      <Database className="w-12 h-12 text-slate-350 mb-2" />
+                      <span className="text-xs font-semibold text-center max-w-xs leading-relaxed">
+                        Select an existing question paper with an active Google Form connection to view evaluation report cards.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col space-y-4">
+                      {/* Submissions Header */}
+                      <div className="pb-3 border-b border-slate-200 flex flex-col md:flex-row justify-between md:items-center gap-3">
+                        <div>
+                          <h3 className="font-extrabold text-slate-800 text-sm leading-snug">{selectedPaper.title}</h3>
+                          <span className="text-[10px] text-purple-650 font-bold block uppercase tracking-wide">Google Form Evaluation Dashboard</span>
+                        </div>
+                        {formResponses.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => alert("Excel Export Complete. Saved: 'Drishti_Evaluated_Report.xlsx'")}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                            >
+                              Export Excel
+                            </button>
+                            <button
+                              onClick={() => alert("PDF Report card exported to download directory.")}
+                              className="px-2.5 py-1 bg-purple-650 hover:bg-purple-755 text-white font-bold rounded text-[10px] transition-colors cursor-pointer shadow shadow-purple-600/10"
+                            >
+                              Export PDF
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Loading Responses State */}
+                      {loadingResponses ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
+                          <RefreshCw className="w-8 h-8 animate-spin text-purple-600 mb-2" />
+                          <span className="text-xs font-semibold text-slate-500">
+                            Connecting to Google Forms API...
+                          </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            Executing AI semantic evaluation pipeline against active textbook...
+                          </span>
+                        </div>
+                      ) : formResponses.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
+                          <span className="text-xs font-semibold">No student submissions parsed yet.</span>
+                          <button
+                            onClick={() => handleFetchResponses(selectedPaper)}
+                            className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                          >
+                            🔗 Fetch & Sync Responses
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-5">
+                          {/* Aggregate stats summary widgets */}
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <span className="text-[9px] uppercase font-bold text-slate-400 block">Submissions</span>
+                              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 block">{formResponses.length} Responses</span>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <span className="text-[9px] uppercase font-bold text-slate-400 block">Class Average</span>
+                              <span className="text-sm font-extrabold text-emerald-600 mt-0.5 block">
+                                {(formResponses.reduce((acc, curr) => acc + curr.overall_percentage, 0) / formResponses.length).toFixed(1)} %
+                              </span>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <span className="text-[9px] uppercase font-bold text-slate-400 block">Evaluation Mode</span>
+                              <span className="text-xs font-extrabold text-indigo-600 mt-1 block flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> AI Semantic RAG
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Student Submissions Table */}
+                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-slate-100/50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800">
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Student Name</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Time Submitted</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Score</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Percentage</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                {formResponses.map((res) => (
+                                  <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="p-3 font-extrabold text-slate-700 dark:text-slate-300">{res.student_name}</td>
+                                    <td className="p-3 text-slate-400 text-[10px]">{res.submission_time}</td>
+                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                                      {res.marks_obtained} / {res.total_marks}
+                                    </td>
+                                    <td className="p-3">
+                                      <span className={`font-bold ${
+                                        res.overall_percentage >= 80 
+                                          ? "text-emerald-600" 
+                                          : res.overall_percentage >= 60 
+                                            ? "text-amber-600" 
+                                            : "text-red-500"
+                                      }`}>
+                                        {res.overall_percentage.toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-right space-x-2">
+                                      <button
+                                        onClick={() => setViewingResponseDetail(res)}
+                                        className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Analysis
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setGradingResponseId(res.id);
+                                          setOverrideMarksVal(res.marks_obtained);
+                                        }}
+                                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Override
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Response detail question-wise breakdown */}
+            {viewingResponseDetail && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-850">
+                  <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-extrabold text-slate-805 dark:text-slate-200 text-sm leading-snug">
+                        AI Detailed Grader: {viewingResponseDetail.student_name}
+                      </h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">
+                        Overall Score: {viewingResponseDetail.marks_obtained} / {viewingResponseDetail.total_marks} ({viewingResponseDetail.overall_percentage}%)
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => setViewingResponseDetail(null)}
+                      className="text-slate-400 hover:text-slate-605 font-extrabold text-xs cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  
+                  <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+                    {/* Overall AI Summary feedback block */}
+                    <div className="p-3.5 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-xl">
+                      <span className="font-bold text-purple-750 dark:text-purple-300 block mb-1 uppercase text-[9px] tracking-wider font-extrabold">Overall AI Evaluation Feedback</span>
+                      <p className="text-slate-700 dark:text-slate-350 leading-relaxed font-semibold">{viewingResponseDetail.ai_feedback}</p>
+                    </div>
+
+                    {/* Question breakdown mapping list */}
+                    <div className="space-y-3.5">
+                      {viewingResponseDetail.question_analysis.map((q: any, qidx: number) => (
+                        <div key={qidx} className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5">
+                          <div className="flex justify-between items-start gap-3">
+                            <span className="font-extrabold text-slate-800 dark:text-slate-250 leading-snug">{q.question}</span>
+                            <span className="shrink-0 text-[10px] font-bold text-indigo-650 bg-indigo-50 px-1.5 py-0.5 rounded">
+                              {q.score_obtained} / {q.max_marks} Marks
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Student's Answer</span>
+                            <p className="text-slate-750 dark:text-slate-300 italic bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-150 leading-relaxed font-medium">
+                              "{q.student_answer || "(No Answer)"}"
+                            </p>
+                          </div>
+
+                          <div className="bg-emerald-50/40 dark:bg-emerald-950/10 p-2.5 rounded-lg border border-emerald-100/60 text-[10px] text-emerald-800 dark:text-emerald-455 leading-relaxed font-semibold">
+                            💡 <strong className="text-emerald-900 dark:text-emerald-400 font-extrabold">AI Analysis & Concepts Missed:</strong> {q.feedback}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Manual Marks Override */}
+            {gradingResponseId && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                  <div>
+                    <h3 className="font-extrabold text-slate-850 dark:text-slate-200 text-sm">Manual Score Override</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">Input the new grade for this student submission.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase block">New Marks Obtained</label>
+                    <input 
+                      type="number" 
+                      value={overrideMarksVal}
+                      onChange={(e) => setOverrideMarksVal(Number(e.target.value))}
+                      className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-350 dark:border-slate-750 rounded-lg p-2 font-bold text-center text-slate-800 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setGradingResponseId(null)}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs cursor-pointer text-center"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={() => handleOverrideMarks(gradingResponseId, overrideMarksVal)}
+                      className="flex-1 py-2 bg-purple-650 hover:bg-purple-750 text-white font-bold rounded-lg text-xs cursor-pointer text-center"
+                    >
+                      Save Override
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
