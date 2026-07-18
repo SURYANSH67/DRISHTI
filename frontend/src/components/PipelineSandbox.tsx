@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import type { BookOverview } from "../services/api";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 interface PipelineSandboxProps {
   books: BookOverview[];
@@ -394,8 +395,8 @@ export default function PipelineSandbox({
                 <p className="text-[10px] text-slate-400 mt-0.5">RAG Content similarity index: {(results.online.similarity_score * 100).toFixed(0)}%</p>
               </div>
 
-              <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-lg border border-slate-100 dark:border-slate-800/80 max-h-60 overflow-y-auto">
-                {results.online.answer}
+              <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-lg border border-slate-100 dark:border-slate-800/80 max-h-60 overflow-y-auto">
+                <MarkdownRenderer content={results.online.answer} />
               </div>
             </div>
 
@@ -410,8 +411,8 @@ export default function PipelineSandbox({
                 <p className="text-[10px] text-slate-400 mt-0.5">RAG Content similarity index: {(results.offline.similarity_score * 100).toFixed(0)}%</p>
               </div>
 
-              <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-lg border border-slate-100 dark:border-slate-800/80 max-h-60 overflow-y-auto">
-                {results.offline.answer}
+              <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-lg border border-slate-100 dark:border-slate-800/80 max-h-60 overflow-y-auto">
+                <MarkdownRenderer content={results.offline.answer} />
               </div>
             </div>
           </div>
