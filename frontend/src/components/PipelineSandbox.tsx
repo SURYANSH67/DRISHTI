@@ -115,11 +115,11 @@ export default function PipelineSandbox({
       <div className="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-extrabold flex items-center gap-2">
+            <h2 className="text-xl font-extrabold flex items-center gap-2" style={{ color: "white" }}>
               <Layers className="w-5 h-5 text-indigo-400" />
               DRISHTI AI: Hybrid Pipeline Sandbox
             </h2>
-            <p className="text-slate-400 text-xs mt-1">
+            <p className="text-slate-400 text-xs mt-1" style={{ color: "#cbd5e1" }}>
               Compare online cloud models side-by-side with local offline Apple Silicon hardware-accelerated processing.
             </p>
           </div>
