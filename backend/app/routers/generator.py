@@ -836,8 +836,33 @@ Return only raw JSON.
                         feedback = grade_data.get("feedback") or "Evaluated."
                     except Exception as grading_err:
                         print(f"Error grading answer: {grading_err}")
-                        score = round(float(q_marks) * 0.75, 1)
-                        feedback = "Evaluated response correctness."
+                        student_ans_clean = matched_ans.strip().lower()
+                        if not student_ans_clean:
+                            score = 0.0
+                            feedback = "No answer was submitted for this question."
+                        else:
+                            # 1. Check if MCQ or True/False answer matching expected answers
+                            is_correct_mcq = False
+                            if len(student_ans_clean) < 15:
+                                if student_ans_clean in answer_key.lower():
+                                    is_correct_mcq = True
+                            
+                            if is_correct_mcq:
+                                score = float(q_marks)
+                                feedback = "Choice matched official answer key reference (fallback evaluation)."
+                            else:
+                                # For descriptive questions: calculate word overlap/length heuristics
+                                words_student = set(student_ans_clean.split())
+                                words_key = set(answer_key.lower().split())
+                                intersection = words_student.intersection(words_key)
+                                
+                                overlap_ratio = len(intersection) / max(1, len(words_student))
+                                if len(student_ans_clean) < 10:
+                                    score = round(float(q_marks) * 0.1, 1)
+                                    feedback = "Answer too short to verify correctness (fallback evaluation)."
+                                else:
+                                    score = round(float(q_marks) * min(1.0, 0.2 + (overlap_ratio * 0.5)), 1)
+                                    feedback = f"Graded via key concept text overlap similarity match (fallback evaluation)."
                         
                 total_score += score
                 total_possible += q_marks

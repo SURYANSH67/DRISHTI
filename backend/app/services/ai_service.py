@@ -129,7 +129,7 @@ class AIService:
         if self.gemini_enabled:
             try:
                 # Format messages for Gemini
-                gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+                gemini_model = genai.GenerativeModel("gemini-1.5-flash")
                 
                 # Simple conversion from message list to prompt text
                 prompt_parts = []
@@ -167,7 +167,7 @@ class AIService:
         if self.gemini_enabled:
             try:
                 img = PILImage.open(image_path)
-                model = genai.GenerativeModel("gemini-2.5-flash")
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 response = model.generate_content([prompt, img])
                 return response.text
             except Exception as e:
