@@ -875,6 +875,7 @@ Return only raw JSON.
                     "feedback": feedback
                 })
                 
+            total_score = round(total_score, 1)
             overall_percentage = round((total_score / total_possible) * 100, 2) if total_possible > 0 else 0
             
             try:
@@ -887,6 +888,9 @@ Return only raw JSON.
                 """
                 ai_feedback = ai_service.chat_completion([{"role": "user", "content": summary_prompt}], temperature=0.3).strip()
             except Exception:
+                ai_feedback = f"Student completed the test. Performance score is {overall_percentage}%."
+                
+            if not ai_feedback or ai_feedback.startswith("Error:") or "All completion APIs failed" in ai_feedback:
                 ai_feedback = f"Student completed the test. Performance score is {overall_percentage}%."
                 
             response_id = f"resp_{uuid.uuid4().hex[:8]}"

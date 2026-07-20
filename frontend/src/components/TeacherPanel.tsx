@@ -2110,10 +2110,15 @@ export default function TeacherPanel({
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                                 {formResponses.map((res) => (
                                   <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="p-3 font-extrabold text-slate-700 dark:text-slate-300 break-all max-w-[180px]">{res.student_name}</td>
+                                    <td 
+                                      className="p-3 font-extrabold text-slate-700 dark:text-slate-300 max-w-[130px] truncate"
+                                      title={res.student_name}
+                                    >
+                                      {res.student_name}
+                                    </td>
                                     <td className="p-3 text-slate-400 text-[10px] whitespace-nowrap">{res.submission_time}</td>
                                     <td className="p-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                                      {res.marks_obtained} / {res.total_marks}
+                                      {Number(res.marks_obtained).toFixed(1).replace(/\.0$/, "")} / {res.total_marks}
                                     </td>
                                     <td className="p-3 whitespace-nowrap">
                                       <span className={`font-bold ${
