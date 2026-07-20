@@ -117,9 +117,19 @@ def setup_database():
         content TEXT NOT NULL,
         metadata TEXT NOT NULL,
         google_form_url TEXT,
+        student_content TEXT,
+        answer_key TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    try:
+        cursor.execute("ALTER TABLE question_papers ADD COLUMN student_content TEXT")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+    try:
+        cursor.execute("ALTER TABLE question_papers ADD COLUMN answer_key TEXT")
+    except sqlite3.OperationalError:
+        pass # Column already exists
 
     # 8. Google Form Responses and AI Grading Evaluations table
     cursor.execute("""

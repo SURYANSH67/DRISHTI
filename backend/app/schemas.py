@@ -107,4 +107,6 @@ class QuestionPaperResponse(BaseModel):
     id: str
     title: str
     content: str
+    student_content: Optional[str] = None
+    answer_key: Optional[str] = None
     metadata: Dict[str, Any]
