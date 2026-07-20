@@ -214,6 +214,22 @@ The React codebase (`frontend/`) uses TypeScript, Tailwind CSS, and Lucide icons
 
 ---
 
+## 📊 Vector Database & RAG Metrics
+
+DRISHTI AI operates a lightweight, high-performance, dimension-aware local vector store to enable semantic search and Retrieval-Augmented Generation (RAG) across the textbook corpus.
+
+### Vector Data Metrics:
+* **Active Indexed Vectors**: `984` dense semantic vectors.
+* **Database Storage Path**: `backend/data/chroma/vector_store.json`
+* **On-Disk File Size**: `~12.0 MB` (serialized JSON indices).
+* **Search Metric**: Cosine Similarity.
+* **Dimension Segregation**:
+  * **Online Embeddings**: `1536` dimensions (sourced via Google Gemini `text-embedding-004`).
+  * **Offline/Local Embeddings**: `384` dimensions (lazy-loaded via local SentenceTransformer `all-MiniLM-L6-v2`).
+* **Dimension Safety Guard**: Auto-segregates searches based on vector dimension (e.g. queries using 384-dim offline vectors only match against 384-dim stored document slices), preventing vector shape calculation crashes.
+
+---
+
 ## 6. Offline Pipeline & Local Fallbacks
 
 DRISHTI AI features a robust offline fallback system that ensures key grading and learning features continue to work without internet connectivity.
