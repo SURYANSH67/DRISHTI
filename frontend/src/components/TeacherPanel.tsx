@@ -248,10 +248,16 @@ export default function TeacherPanel({
   const handleConvertToForm = async (paperId: string) => {
     setConvertingPaperId(paperId);
     try {
-      await api.convertPaperToGoogleForm(paperId, appsScriptUrl, sharingEmail);
+      const res = await api.convertPaperToGoogleForm(paperId, appsScriptUrl, sharingEmail);
       await fetchPapers();
+      if (res.google_form_url && res.google_form_url.startsWith("http")) {
+        alert("Google Form Created Successfully! Link updated in the table.");
+      } else {
+        alert("Created local interactive assessment test link successfully! (Fell back from Google Forms because the Apps Script URL was not configured or rejected the request)");
+      }
     } catch (err) {
       console.error("Failed to convert paper:", err);
+      alert("Failed to convert paper: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setConvertingPaperId(null);
     }
