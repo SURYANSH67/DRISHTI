@@ -219,18 +219,6 @@ export default function TeacherPanel({
   const [gradingResponseId, setGradingResponseId] = useState<string | null>(null);
   const [overrideMarksVal, setOverrideMarksVal] = useState<number>(0);
   const [viewingResponseDetail, setViewingResponseDetail] = useState<any | null>(null);
-  const [appsScriptUrl, setAppsScriptUrl] = useState(() => localStorage.getItem("drishti_apps_script_url") || "");
-  const [sharingEmail, setSharingEmail] = useState(() => localStorage.getItem("drishti_sharing_email") || "suryanshdixit493@gmail.com");
-  const [showScriptDetails, setShowScriptDetails] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem("drishti_apps_script_url", appsScriptUrl);
-  }, [appsScriptUrl]);
-
-  useEffect(() => {
-    localStorage.setItem("drishti_sharing_email", sharingEmail);
-  }, [sharingEmail]);
-
   const fetchPapers = async () => {
     setLoadingPapers(true);
     try {
@@ -246,7 +234,7 @@ export default function TeacherPanel({
   const handleConvertToForm = async (paperId: string) => {
     setConvertingPaperId(paperId);
     try {
-      await api.convertPaperToGoogleForm(paperId, appsScriptUrl, sharingEmail);
+      await api.convertPaperToGoogleForm(paperId);
       await fetchPapers();
     } catch (err) {
       console.error("Failed to convert paper:", err);
@@ -259,7 +247,7 @@ export default function TeacherPanel({
     setSelectedPaper(paper);
     setLoadingResponses(true);
     try {
-      const data = await api.getFormResponses(paper.id, appsScriptUrl);
+      const data = await api.getFormResponses(paper.id);
       setFormResponses(data);
     } catch (err) {
       console.error("Failed to fetch responses:", err);
@@ -1362,7 +1350,7 @@ export default function TeacherPanel({
                 }`}
               >
                 <Database className="w-4 h-4" />
-                Google Forms & Student Evaluations
+                Interactive Test & Student Evaluations
               </button>
             </div>
 
@@ -1606,15 +1594,15 @@ export default function TeacherPanel({
                           setActiveSubTab("forms");
                         }}
                         disabled={convertingPaperId === generatedPaperId}
-                        className="px-3 py-1.5 bg-indigo-650 hover:bg-indigo-750 disabled:bg-indigo-400 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-indigo-650/10"
-                        title="Deploy as a Google Form in your Drive"
+                        className="px-3 py-1.5 bg-indigo-655 hover:bg-indigo-755 disabled:bg-indigo-400 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-indigo-650/10"
+                        title="Create interactive assessment form link"
                       >
                         {convertingPaperId === generatedPaperId ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <Layers className="w-3.5 h-3.5" />
                         )}
-                        Convert to Google Form
+                        Create Assessment Link
                       </button>
                     </div>
                   </div>
@@ -1635,70 +1623,6 @@ export default function TeacherPanel({
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left Column: List of existing papers */}
                 <div className="glass-panel p-5 rounded-2xl lg:col-span-5 space-y-4 border border-slate-200/80 shadow-md">
-                  {/* Google Apps Script Integration Banner */}
-                  <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
-                    <span className="text-[10px] font-bold text-slate-450 dark:text-slate-400 block uppercase tracking-wider">🔗 Connect Google Drive Integration</span>
-                    <p className="text-[10px] text-slate-500 leading-normal">
-                      Provide your Google Apps Script Web App URL to automatically create real Google Forms in your Google Drive and fetch responses.
-                    </p>
-                    <div className="space-y-2">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase">Apps Script Web App URL</label>
-                        <input
-                          type="url"
-                          placeholder="https://script.google.com/macros/s/.../exec"
-                          value={appsScriptUrl}
-                          onChange={(e) => setAppsScriptUrl(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800/80 rounded-lg p-2 font-mono text-[10px] text-slate-700 dark:text-slate-200"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 block uppercase">Teacher's Gmail (for Form sharing)</label>
-                        <input
-                          type="email"
-                          placeholder="suryanshdixit493@gmail.com"
-                          value={sharingEmail}
-                          onChange={(e) => setSharingEmail(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800/80 rounded-lg p-2 font-mono text-[10px] text-slate-700 dark:text-slate-200"
-                        />
-                      </div>
-                      <div className="flex justify-between items-center text-[9px] pt-1">
-                        <span className={`font-semibold ${appsScriptUrl ? 'text-emerald-600' : 'text-amber-500'}`}>
-                          {appsScriptUrl ? '✓ Connected to real Forms API' : '⚠ Using offline demo fallback'}
-                        </span>
-                        <button
-                          onClick={() => setShowScriptDetails(!showScriptDetails)}
-                          className="text-purple-650 hover:underline cursor-pointer font-bold"
-                        >
-                          {showScriptDetails ? 'Hide Setup Code' : 'Get Apps Script Code'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {showScriptDetails && (
-                      <div className="mt-3 space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
-                        <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider font-extrabold">Setup Instructions</span>
-                        <ol className="text-[9px] text-slate-500 list-decimal pl-4 space-y-1 leading-normal">
-                          <li>Go to <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-purple-600 hover:underline font-bold">script.google.com</a> and click <strong>New Project</strong>.</li>
-                          <li>Delete existing code, paste the template below, and click <strong>Save</strong>.</li>
-                          <li>Click <strong>Deploy</strong> &gt; <strong>New Deployment</strong>.</li>
-                          <li>Select type <strong>Web App</strong>. Execute as <strong>Me</strong>. Who has access: <strong>Anyone</strong>.</li>
-                          <li>Deploy and copy the Web App URL into the input field above.</li>
-                        </ol>
-                        <textarea
-                          readOnly
-                          onClick={(e) => {
-                            (e.target as HTMLTextAreaElement).select();
-                            document.execCommand("copy");
-                            alert("Apps Script code copied to clipboard!");
-                          }}
-                          value={`function doGet(e) {\n  return ContentService.createTextOutput("DRISHTI AI Apps Script Bridge is Active!")\n    .setMimeType(ContentService.MimeType.TEXT);\n}\n\nfunction doPost(e) {\n  try {\n    var data = JSON.parse(e.postData.contents);\n    \n    if (data.action === "create_form") {\n      var form = FormApp.create(data.title);\n      form.setDescription("Generated by DRISHTI AI - RAG Classroom Evaluator");\n      \n      if (data.teacher_email && data.teacher_email.trim()) {\n        try {\n          var file = DriveApp.getFileById(form.getId());\n          file.addEditor(data.teacher_email.trim());\n        } catch(e) {}\n      }\n      \n      try {\n        form.setCollectEmail(true);\n      } catch(e) {}\n      \n      var items = data.questions;\n      for (var i = 0; i < items.length; i++) {\n        var q = items[i];\n        var itemType = q.type || "paragraph";\n        \n        if (itemType === "mcq" || itemType === "multiple_choice") {\n          var mcItem = form.addMultipleChoiceItem();\n          mcItem.setTitle(q.question);\n          if (q.choices && q.choices.length > 0) {\n            mcItem.setChoiceValues(q.choices);\n          } else {\n            mcItem.setChoiceValues(["Option A", "Option B", "Option C", "Option D"]);\n          }\n        } else if (itemType === "true_false") {\n          var tfItem = form.addMultipleChoiceItem();\n          tfItem.setTitle(q.question);\n          tfItem.setChoiceValues(["True", "False"]);\n        } else if (itemType === "short_answer") {\n          var tItem = form.addTextItem();\n          tItem.setTitle(q.question);\n        } else {\n          var pItem = form.addParagraphTextItem();\n          pItem.setTitle(q.question);\n        }\n      }\n      \n      return ContentService.createTextOutput(JSON.stringify({\n        status: "success",\n        form_url: form.getPublishedUrl(),\n        form_id: form.getId()\n      })).setMimeType(ContentService.MimeType.JSON);\n    }\n    \n    if (data.action === "get_responses") {\n      var form = FormApp.openById(data.form_id);\n      var responses = form.getResponses();\n      var results = [];\n      \n      for (var i = 0; i < responses.length; i++) {\n        var r = responses[i];\n        var itemResponses = r.getItemResponses();\n        var student_answers = {};\n        \n        for (var j = 0; j < itemResponses.length; j++) {\n          var itemRes = itemResponses[j];\n          student_answers[itemRes.getItem().getTitle()] = itemRes.getResponse();\n        }\n        \n        results.push({\n          student_name: r.getRespondentEmail() || "Student " + (i + 1),\n          submission_time: r.getTimestamp().toISOString(),\n          answers: student_answers\n        });\n      }\n      \n      return ContentService.createTextOutput(JSON.stringify({\n        status: "success",\n        responses: results\n      })).setMimeType(ContentService.MimeType.JSON);\n    }\n    \n    return ContentService.createTextOutput(JSON.stringify({\n      status: "error",\n      message: "Unknown action"\n    })).setMimeType(ContentService.MimeType.JSON);\n    \n  } catch (err) {\n    return ContentService.createTextOutput(JSON.stringify({\n      status: "error",\n      message: err.toString()\n    })).setMimeType(ContentService.MimeType.JSON);\n  }\n}`}
-                          className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 font-mono text-[8px] h-28 cursor-pointer select-all"
-                        />
-                        <span className="text-[7px] text-slate-450 block text-right">Click textarea to copy code automatically.</span>
-                      </div>
-                    )}
-                  </div>
 
                   <div className="border-b border-slate-200 pb-2 flex justify-between items-center">
                     <div>
@@ -1746,7 +1670,7 @@ export default function TeacherPanel({
                               <span>Pattern: {paper.metadata?.pattern}</span>
                             </div>
 
-                            {/* Google Form Link / Status */}
+                            {/* Interactive Assessment Link / Status */}
                             <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
                               {paper.google_form_url ? (
                                 <>
@@ -1758,7 +1682,7 @@ export default function TeacherPanel({
                                     className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
                                   >
                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    {paper.google_form_url.startsWith("http") ? "Google Form Link" : "Interactive Mock Form"}
+                                    Interactive Test Link
                                   </a>
                                   <button
                                     onClick={(e) => {
@@ -1772,7 +1696,7 @@ export default function TeacherPanel({
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-[10px] text-slate-400 italic">No Active Form</span>
+                                  <span className="text-[10px] text-slate-400 italic">No Active Link</span>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1781,7 +1705,7 @@ export default function TeacherPanel({
                                     disabled={convertingPaperId === paper.id}
                                     className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 font-bold rounded border border-indigo-200 cursor-pointer transition-colors"
                                   >
-                                    {convertingPaperId === paper.id ? "Converting..." : "Convert to Google Form"}
+                                    {convertingPaperId === paper.id ? "Creating..." : "Create Test Link"}
                                   </button>
                                 </>
                               )}
@@ -1799,7 +1723,7 @@ export default function TeacherPanel({
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
                       <Database className="w-12 h-12 text-slate-350 mb-2" />
                       <span className="text-xs font-semibold text-center max-w-xs leading-relaxed">
-                        Select an existing question paper with an active Google Form connection to view evaluation report cards.
+                        Select a question paper to view its assessment evaluations and student report cards.
                       </span>
                     </div>
                   ) : (
@@ -1808,7 +1732,7 @@ export default function TeacherPanel({
                       <div className="pb-3 border-b border-slate-200 flex flex-col md:flex-row justify-between md:items-center gap-3">
                         <div>
                           <h3 className="font-extrabold text-slate-800 text-sm leading-snug">{selectedPaper.title}</h3>
-                          <span className="text-[10px] text-purple-650 font-bold block uppercase tracking-wide">Google Form Evaluation Dashboard</span>
+                          <span className="text-[10px] text-purple-650 font-bold block uppercase tracking-wide">Interactive Assessment Dashboard</span>
                         </div>
                         {formResponses.length > 0 && (
                           <div className="flex items-center gap-2">
@@ -1833,7 +1757,7 @@ export default function TeacherPanel({
                         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
                           <RefreshCw className="w-8 h-8 animate-spin text-purple-600 mb-2" />
                           <span className="text-xs font-semibold text-slate-500">
-                            Connecting to Google Forms API...
+                            Retrieving student response assessments...
                           </span>
                           <span className="text-[10px] text-slate-400 mt-0.5">
                             Executing AI semantic evaluation pipeline against active textbook...

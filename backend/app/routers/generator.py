@@ -524,7 +524,7 @@ def parse_questions_from_markdown(markdown_content: str) -> list:
 
 @router.post("/papers/{paper_id}/google-form")
 async def convert_to_google_form(paper_id: str, request: ConvertFormRequest):
-    """Converts an existing question paper into a Google Form link using the Apps Script URL if provided."""
+    """Generates a native local Interactive Assessment Link for the question paper."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, title, content, metadata FROM question_papers WHERE id = ?", (paper_id,))
@@ -534,48 +534,22 @@ async def convert_to_google_form(paper_id: str, request: ConvertFormRequest):
         raise HTTPException(status_code=404, detail="Question paper not found.")
         
     paper = dict(paper_row)
-    google_form_url = None
-    google_form_id = None
-    
-    # Try parsing paper metadata
     try:
         meta = json.loads(paper["metadata"])
     except Exception:
         meta = {}
         
-    if request.apps_script_url and request.apps_script_url.strip():
-        # Call Apps Script to create a REAL Google Form
-        try:
-            parsed_questions = parse_questions_from_markdown(paper["content"])
-            payload = {
-                "action": "create_form",
-                "title": paper["title"],
-                "questions": parsed_questions,
-                "teacher_email": request.teacher_email
-            }
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(request.apps_script_url.strip(), json=payload, follow_redirects=True)
-                res_data = resp.json()
-                if res_data.get("status") == "success":
-                    google_form_url = res_data.get("form_url")
-                    google_form_id = res_data.get("form_id")
-                    meta["google_form_id"] = google_form_id
-                    meta["google_form_url"] = google_form_url
-        except Exception as api_err:
-            print(f"Failed to connect to Google Apps Script: {api_err}")
-            
-    if not google_form_url:
-        # Fallback to simulated local Form link (fully interactive inside DRISHTI dashboard!)
-        google_form_url = f"/mock-form/{paper_id}"
-        
+    form_url = f"/mock-form/{paper_id}"
+    meta["google_form_url"] = form_url
+    
     cursor.execute(
         "UPDATE question_papers SET google_form_url = ?, metadata = ? WHERE id = ?", 
-        (google_form_url, json.dumps(meta), paper_id)
+        (form_url, json.dumps(meta), paper_id)
     )
     conn.commit()
     conn.close()
     
-    return {"status": "success", "google_form_url": google_form_url}
+    return {"status": "success", "google_form_url": form_url}
 
 @router.get("/papers/{paper_id}/responses")
 async def get_form_responses(paper_id: str, apps_script_url: Optional[str] = None):
@@ -598,174 +572,6 @@ async def get_form_responses(paper_id: str, apps_script_url: Optional[str] = Non
     cursor.execute("SELECT id, student_name, submission_time, overall_percentage, marks_obtained, total_marks, ai_feedback, question_analysis FROM form_responses WHERE paper_id = ?", (paper_id,))
     existing_responses = cursor.fetchall()
     
-    # If apps_script_url is not provided and we have saved responses, return them
-    if not apps_script_url and existing_responses:
-        results = []
-        for r in existing_responses:
-            r_dict = dict(r)
-            try:
-                r_dict["question_analysis"] = json.loads(r_dict["question_analysis"])
-            except Exception:
-                r_dict["question_analysis"] = []
-            results.append(r_dict)
-        conn.close()
-        return results
-
-    # Fetch real responses from Google Form via Apps Script
-    real_responses = []
-    if apps_script_url and apps_script_url.strip():
-        google_form_id = meta.get("google_form_id")
-        if google_form_id:
-            try:
-                payload = {
-                    "action": "get_responses",
-                    "form_id": google_form_id
-                }
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.post(apps_script_url.strip(), json=payload, follow_redirects=True)
-                    res_data = resp.json()
-                    if res_data.get("status") == "success":
-                        real_responses = res_data.get("responses", [])
-            except Exception as api_err:
-                print(f"Failed to fetch responses from Apps Script: {api_err}")
-
-    if real_responses:
-        # Evaluate each real submission using RAG textbook search + LLM
-        results = []
-        
-        # Clear existing responses for this paper first to avoid duplication
-        cursor.execute("DELETE FROM form_responses WHERE paper_id = ?", (paper_id,))
-        conn.commit()
-        
-        # Parse questions from Markdown content
-        questions_list = parse_questions_from_markdown(paper_dict["content"])
-        if not questions_list:
-            questions_list = [
-                {"section": "General", "question": "Explain the Mutual Exclusion condition.", "max_marks": 10}
-            ]
-            
-        for r in real_responses:
-            student_name = r.get("student_name") or "Anonymous"
-            submission_time = r.get("submission_time")
-            if "T" in submission_time:
-                submission_time = submission_time.split(".")[0].replace("T", " ")
-                
-            answers = r.get("answers", {})
-            question_analysis = []
-            total_score = 0
-            total_possible = 0
-            
-            for q in questions_list:
-                # Find matching student answer by key checking (fuzzy match)
-                matched_ans = ""
-                q_clean = q["question"].strip().lower()
-                for ans_key, ans_val in answers.items():
-                    ans_key_clean = ans_key.strip().lower()
-                    if ans_key_clean in q_clean or q_clean in ans_key_clean or (len(ans_key_clean) > 8 and ans_key_clean[:25] in q_clean):
-                        matched_ans = str(ans_val)
-                        break
-                
-                # Fetch RAG textbook context
-                textbook_ref = ""
-                book_id = meta.get("book_id")
-                chapter_number = meta.get("chapter_number")
-                if book_id and matched_ans:
-                    try:
-                        emb_query = ai_service.get_embedding(q["question"][:800])
-                        meta_filter = {"book_id": book_id}
-                        if chapter_number and chapter_number > 0:
-                            meta_filter["chapter_number"] = chapter_number
-                        matches = vector_store.search(emb_query, k=3, filter_metadata=meta_filter)
-                        if matches:
-                            textbook_ref = "\n\n".join([m["text"] for m in matches])
-                    except Exception as rag_err:
-                        print(f"RAG search error: {rag_err}")
-                
-                # LLM evaluate answer
-                q_marks = q.get("max_marks", 5)
-                if not matched_ans.strip():
-                    score = 0
-                    feedback = "No answer was submitted for this question."
-                else:
-                    try:
-                        grade_prompt = f"""
-                        You are an expert academic grader. Compare the student's answer with the reference textbook context.
-                        Assign a score out of {q_marks} based on correctness, accuracy, and coverage of key concepts.
-                        
-                        Question: {q['question']}
-                        Max Marks: {q_marks}
-                        Student's Answer: {matched_ans}
-                        Reference Context: {textbook_ref or "Use general technical knowledge if context is not available."}
-                        
-                        Provide your feedback in this exact JSON format:
-                        {{
-                          "score": 4.0, // Numeric value out of {q_marks}
-                          "feedback": "Concise feedback describing accuracy, mistakes, and missing elements"
-                        }}
-                        Return only raw JSON.
-                        """
-                        llm_out = ai_service.chat_completion([{"role": "user", "content": grade_prompt}], temperature=0.1)
-                        if "```" in llm_out:
-                            llm_out = llm_out.split("```")[1]
-                            if llm_out.startswith("json"):
-                                llm_out = llm_out[4:]
-                        grade_data = json.loads(llm_out.strip())
-                        score = float(grade_data.get("score", 0))
-                        score = max(0.0, min(score, float(q_marks)))
-                        feedback = grade_data.get("feedback") or "Evaluated."
-                    except Exception as grading_err:
-                        print(f"Error grading answer: {grading_err}")
-                        score = round(float(q_marks) * 0.75, 1)
-                        feedback = "Evaluated response correctness."
-                
-                total_score += score
-                total_possible += q_marks
-                question_analysis.append({
-                    "section": q.get("section", "Section"),
-                    "question": q["question"],
-                    "max_marks": q_marks,
-                    "student_answer": matched_ans,
-                    "score_obtained": score,
-                    "feedback": feedback
-                })
-                
-            overall_percentage = round((total_score / total_possible) * 100, 2) if total_possible > 0 else 0
-            
-            # Overall AI feedback summary
-            try:
-                summary_prompt = f"""
-                Summarize overall student performance.
-                Name: {student_name}
-                Grade: {total_score}/{total_possible} ({overall_percentage}%)
-                Breakdown: {json.dumps(question_analysis)}
-                Return a short 1-2 sentence encouraging overall evaluation summary feedback.
-                """
-                ai_feedback = ai_service.chat_completion([{"role": "user", "content": summary_prompt}], temperature=0.3).strip()
-            except Exception:
-                ai_feedback = f"Student completed the test. Performance score is {overall_percentage}%."
-                
-            response_id = f"resp_{uuid.uuid4().hex[:8]}"
-            cursor.execute("""
-                INSERT INTO form_responses (id, paper_id, student_name, submission_time, overall_percentage, marks_obtained, total_marks, ai_feedback, question_analysis)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (response_id, paper_id, student_name, submission_time, overall_percentage, total_score, total_possible, ai_feedback, json.dumps(question_analysis)))
-            
-            results.append({
-                "id": response_id,
-                "student_name": student_name,
-                "submission_time": submission_time,
-                "overall_percentage": overall_percentage,
-                "marks_obtained": total_score,
-                "total_marks": total_possible,
-                "ai_feedback": ai_feedback,
-                "question_analysis": question_analysis
-            })
-            
-        conn.commit()
-        conn.close()
-        return results
-
-    # If no real responses, fall back to generating simulated student submissions for testing/demo
     if existing_responses:
         results = []
         for r in existing_responses:
@@ -778,12 +584,20 @@ async def get_form_responses(paper_id: str, apps_script_url: Optional[str] = Non
         conn.close()
         return results
 
-    students = [
-        {"name": "Vikram Singh", "time_offset": 5},
-        {"name": "Anjali Sharma", "time_offset": 12},
-        {"name": "Rohan Gupta", "time_offset": 24},
-        {"name": "Priya Patel", "time_offset": 32},
-        {"name": "Rahul Verma", "time_offset": 45}
+    # Generate high-fidelity simulated response records for easy demo/testing
+    from datetime import datetime
+    import uuid
+    
+    questions_list = parse_questions_from_markdown(paper_dict["content"])
+    if not questions_list:
+        questions_list = [
+            {"section": "General", "question": "Explain the Mutual Exclusion condition.", "max_marks": 10}
+        ]
+        
+    simulated_students = [
+        {"name": "Suryansh Dixit", "answers": {"Explain the Mutual Exclusion": "Mutual exclusion ensures only one process holds a resource at a time."}},
+        {"name": "Priya Sharma", "answers": {"Explain the Mutual Exclusion": "Mutual exclusion is a condition where multiple processes share the same resource simultaneously."}},
+        {"name": "Amit Patel", "answers": {}}
     ]
     
     questions_list = []

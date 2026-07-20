@@ -202,14 +202,14 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f0ebf8] py-8 px-4 flex justify-center">
+    <div className="min-h-screen bg-slate-50 py-8 px-4 flex justify-center">
       <div className="max-w-2xl w-full space-y-4">
         {/* Decorative Top Bar */}
-        <div className="h-2.5 bg-[#673ab7] rounded-t-lg"></div>
+        <div className="h-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-t-lg"></div>
 
         {/* Paper Title Card */}
-        <div className="bg-white p-6 rounded-b-lg border border-slate-200 shadow-sm space-y-3">
-          <h1 className="text-2xl font-bold text-slate-900">{paper.title}</h1>
+        <div className="bg-white p-6 rounded-b-lg border-x border-b border-slate-200 shadow-sm space-y-3 border-l-4 border-l-indigo-600">
+          <h1 className="text-xl font-black text-slate-800">{paper.title}</h1>
           <p className="text-xs text-slate-500 leading-relaxed font-semibold">
             Please answer all questions below. Your answers will be graded by DRISHTI AI against the active course textbook syllabus.
           </p>
@@ -221,7 +221,7 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Student Name Card */}
           <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-3">
-            <label className="text-xs font-extrabold text-slate-800 block">
+            <label className="text-xs font-extrabold text-slate-700 block">
               Student Full Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -230,7 +230,7 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
               placeholder="Your answer"
               value={studentName}
               onChange={(e) => setStudentName(e.target.value)}
-              className="w-full max-w-sm border-b-2 border-slate-200 hover:border-slate-350 focus:border-[#673ab7] focus:outline-none py-1.5 text-xs text-slate-800 transition-colors bg-transparent"
+              className="w-full max-w-sm border-b-2 border-slate-200 hover:border-slate-350 focus:border-indigo-600 focus:outline-none py-1.5 text-xs text-slate-800 transition-colors bg-transparent"
             />
           </div>
 
@@ -256,7 +256,7 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
                         value={choice}
                         checked={answers[q.question] === choice}
                         onChange={() => handleAnswerChange(q.question, choice)}
-                        className="w-4 h-4 text-[#673ab7] border-slate-300 focus:ring-[#673ab7]"
+                        className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
                       />
                       <span>{choice}</span>
                     </label>
@@ -272,7 +272,7 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
                         value={choice}
                         checked={answers[q.question] === choice}
                         onChange={() => handleAnswerChange(q.question, choice)}
-                        className="w-4 h-4 text-[#673ab7] border-slate-300 focus:ring-[#673ab7]"
+                        className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
                       />
                       <span>{choice}</span>
                     </label>
@@ -285,7 +285,7 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
                     rows={q.type === "short_answer" ? 2 : 4}
                     value={answers[q.question] || ""}
                     onChange={(e) => handleAnswerChange(q.question, e.target.value)}
-                    className="w-full border border-slate-200 hover:border-slate-300 focus:border-[#673ab7] focus:outline-none rounded-lg p-3 text-xs text-slate-850 bg-slate-50/50"
+                    className="w-full border border-slate-200 hover:border-slate-350 focus:border-indigo-600 focus:outline-none rounded-lg p-3 text-xs text-slate-850 bg-slate-50/50"
                   />
                 </div>
               )}
@@ -297,7 +297,7 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2 bg-[#673ab7] hover:bg-[#5e35b1] disabled:bg-[#9575cd] text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-6 py-2 bg-indigo-650 hover:bg-indigo-755 disabled:bg-indigo-400 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-indigo-600/10"
             >
               <Send className="w-3.5 h-3.5" />
               {submitting ? "Submitting..." : "Submit Response"}
