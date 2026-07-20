@@ -190,7 +190,8 @@ export const api = {
     questionTypes: string[],
     autoDistribute: boolean,
     customDistribution?: Record<string, number>,
-    aiOptions?: string[]
+    aiOptions?: string[],
+    institutionName?: string
   ): Promise<{ id: string; title: string; content: string; student_content?: string; answer_key?: string; metadata: any }> {
     const res = await fetch(`${API_BASE_URL}/generator/paper`, {
       method: "POST",
@@ -206,7 +207,8 @@ export const api = {
         question_types: questionTypes,
         auto_distribute: autoDistribute,
         custom_distribution: customDistribution || null,
-        ai_options: aiOptions || []
+        ai_options: aiOptions || [],
+        institution_name: institutionName
       }),
     });
     if (!res.ok) throw new Error("Failed to generate custom question paper");

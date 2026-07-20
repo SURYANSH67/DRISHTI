@@ -103,6 +103,7 @@ export default function TeacherPanel({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [subjectName, setSubjectName] = useState("");
+  const [institutionName, setInstitutionName] = useState("MALLA REDDY COLLEGE OF ENGINEERING & TECHNOLOGY");
 
   // Advanced Question Paper Settings
   const [examType, setExamType] = useState("Mid Semester");
@@ -312,7 +313,8 @@ export default function TeacherPanel({
         questionTypes,
         autoDistribute,
         autoDistribute ? undefined : customDistribution,
-        aiOptions
+        aiOptions,
+        institutionName
       );
       setGeneratedPaperMarkdown(data.student_content || data.content);
       setGeneratedAnswerKeyMarkdown(data.answer_key || "");
@@ -1387,6 +1389,18 @@ export default function TeacherPanel({
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-lg font-bold text-slate-800">Question Paper Configuration</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Design exam parameters and let AI build balanced tests.</p>
+              </div>
+
+              {/* Institution Name */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">University / Institution Name</label>
+                <input
+                  type="text"
+                  value={institutionName}
+                  onChange={(e) => setInstitutionName(e.target.value)}
+                  placeholder="e.g. MALLA REDDY COLLEGE OF ENGINEERING & TECHNOLOGY"
+                  className="w-full px-3 py-2 bg-white border border-slate-350 rounded-xl text-xs text-slate-850 focus:outline-none focus:border-purple-500 font-semibold"
+                />
               </div>
 
               {/* Target Chapter selection */}

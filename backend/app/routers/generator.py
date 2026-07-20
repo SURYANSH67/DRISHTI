@@ -322,9 +322,12 @@ async def generate_question_paper(request: QuestionPaperGenerateRequest):
         opt_items = [f"- {opt}" for opt in request.ai_options]
         ai_options_prompt = "Apply these pedagogical options:\n" + "\n".join(opt_items)
 
+    inst_name = request.institution_name or "MALLA REDDY COLLEGE OF ENGINEERING & TECHNOLOGY"
+
     paper_prompt = f"""
 Create a highly professional academic Exam Paper (questions only) AND a corresponding detailed Teacher Answer Key based on the textbook context provided below.
 
+Institution/University Name: {inst_name}
 Chapter/Book Title: {chapter['title'] if chapter else metadata.get('filename')}
 Exam Type: {request.exam_type}
 Pattern Style: {request.pattern}
@@ -345,13 +348,26 @@ TEXTBOOK CONTEXT:
 ---
 
 INSTRUCTIONS FOR STUDENT EXAM PAPER:
-1. Generate a beautifully structured exam paper. Use clear sections (e.g. Section A: MCQs, Section B: Short Answers, Section C: Long Answers, Section D: Numerical Problems/HOTS).
-2. For each question, display marks clearly in brackets (e.g., "[2 Marks]" or "[5 Marks]").
-3. Include header fields for Institution/Organization Name, Subject, Chapter, Date, Duration, Maximum Marks, and Student Instructions at the top.
+1. Start with a clean, beautifully formatted Academic Header:
+   # {inst_name}
+   ## {request.exam_type} - Cloud Computing
+   **Chapter:** {chapter['title'] if chapter else "Full Syllabus"} | **Duration:** {request.duration_hours} Hours | **Maximum Marks:** {request.total_marks} Marks
+   ***
+   **Student Instructions:**
+   - Read all questions carefully before attempting.
+   - Answer all questions matching your section pattern.
+   - Write legibly and clearly.
+   ***
+2. Use clear section headers starting with "## " (e.g. "## Section A: MCQs (5 Marks)", "## Section B: Short Answer Questions").
+3. For each question, display marks clearly in brackets (e.g., "[1 Mark]" or "[5 Marks]").
 4. DO NOT include any answers, solutions, hints, or explanations in the student exam paper.
 
 INSTRUCTIONS FOR TEACHER ANSWER KEY:
-1. For every single question in the student exam paper, provide:
+1. Start with a clean header:
+   # TEACHER ANSWER KEY & SOLUTIONS
+   ## Reference for: {request.exam_type} ({request.total_marks} Marks)
+   ***
+2. For every single question in the student exam paper, provide:
    - Question text.
    - Model answer.
    - Detailed explanation.
@@ -449,7 +465,8 @@ Example output structure:
                 "duration_hours": request.duration_hours,
                 "difficulty": request.difficulty,
                 "question_types": request.question_types,
-                "ai_options": request.ai_options or []
+                "ai_options": request.ai_options or [],
+                "institution_name": inst_name
             }), student_content, answer_key))
             conn.commit()
             conn.close()
@@ -471,7 +488,8 @@ Example output structure:
                 "duration_hours": request.duration_hours,
                 "difficulty": request.difficulty,
                 "question_types": request.question_types,
-                "ai_options": request.ai_options or []
+                "ai_options": request.ai_options or [],
+                "institution_name": inst_name
             }
         )
     except Exception as e:

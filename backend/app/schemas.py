@@ -102,6 +102,7 @@ class QuestionPaperGenerateRequest(BaseModel):
     auto_distribute: bool = True
     custom_distribution: Optional[Dict[str, int]] = None
     ai_options: Optional[List[str]] = None
+    institution_name: Optional[str] = None
 
 class QuestionPaperResponse(BaseModel):
     id: str
