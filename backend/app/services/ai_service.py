@@ -127,21 +127,28 @@ class AIService:
 
         # 2. Try Gemini (gemini-2.5-flash)
         if self.gemini_enabled:
-            try:
-                # Format messages for Gemini
-                gemini_model = genai.GenerativeModel("gemini-1.5-flash")
-                
-                # Simple conversion from message list to prompt text
-                prompt_parts = []
-                for msg in messages:
-                    role = "Teacher/System" if msg["role"] == "system" else msg["role"].capitalize()
-                    prompt_parts.append(f"{role}: {msg['content']}")
-                prompt_text = "\n\n".join(prompt_parts) + "\n\nAssistant (Please response matching the requested format):"
+            for attempt in range(3):
+                try:
+                    # Format messages for Gemini
+                    gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+                    
+                    # Simple conversion from message list to prompt text
+                    prompt_parts = []
+                    for msg in messages:
+                        role = "Teacher/System" if msg["role"] == "system" else msg["role"].capitalize()
+                        prompt_parts.append(f"{role}: {msg['content']}")
+                    prompt_text = "\n\n".join(prompt_parts) + "\n\nAssistant (Please response matching the requested format):"
 
-                response = gemini_model.generate_content(prompt_text)
-                return response.text
-            except Exception as e:
-                print(f"Gemini chat completion failed: {e}. Falling back...")
+                    response = gemini_model.generate_content(prompt_text)
+                    return response.text
+                except Exception as e:
+                    if "429" in str(e) and attempt < 2:
+                        import time
+                        print(f"Gemini rate limit 429 hit, retrying in 2.5 seconds (attempt {attempt + 1})...")
+                        time.sleep(2.5)
+                        continue
+                    print(f"Gemini chat completion failed: {e}. Falling back...")
+                    break
 
         # 3. Try OpenAI (gpt-4o-mini)
         if self.openai_client:
@@ -167,7 +174,7 @@ class AIService:
         if self.gemini_enabled:
             try:
                 img = PILImage.open(image_path)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-2.5-flash")
                 response = model.generate_content([prompt, img])
                 return response.text
             except Exception as e:
