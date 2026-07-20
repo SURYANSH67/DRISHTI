@@ -516,19 +516,30 @@ class ConvertFormRequest(BaseModel):
     teacher_email: Optional[str] = None
 
 def parse_questions_from_markdown(markdown_content: str) -> list:
+    import re
     questions = []
     lines = markdown_content.split("\n")
     current_question = None
     current_section = "General"
     skip_current_section = False
     
+    q_re = re.compile(r'^(?:Question\s*\d+|Q\d+|\d+)[.):-]\s*(.*)', re.IGNORECASE)
+    
     for line in lines:
         stripped = line.strip()
         if not stripped:
             continue
+            
+        # Clean asterisks from bold sections/headers
+        clean_line = stripped.replace("*", "").replace("#", "").strip()
+        clean_lower = clean_line.lower()
         
-        if stripped.startswith("#") or (stripped.startswith("Section") and ":" in stripped) or stripped.lower().startswith("section"):
-            current_section = stripped.replace("#", "").strip()
+        # Robust section detection
+        if stripped.startswith("#") or clean_lower.startswith("section") or ("section " in clean_lower and ":" in clean_line):
+            if current_question:
+                questions.append(current_question)
+                current_question = None
+            current_section = clean_line
             sec_lower = current_section.lower()
             if any(term in sec_lower for term in ["answer", "solution", "key", "grading"]):
                 skip_current_section = True
@@ -539,49 +550,62 @@ def parse_questions_from_markdown(markdown_content: str) -> list:
         if skip_current_section:
             continue
             
-        # Check if line matches a numbered item: "1. What is...", "Q1. ...", "1) ..."
-        is_numbered = False
-        prefix_len = 0
-        for i, char in enumerate(stripped[:5]):
-            if char.isdigit():
-                continue
-            if i > 0 and char in [".", ")", ":"]:
-                is_numbered = True
-                prefix_len = i + 1
-                break
-            break
+        # Skip top-level academic metadata/headers/instructions
+        lower_stripped = stripped.lower()
+        if any(ins in lower_stripped for ins in [
+            "read all", "attempt all", "write legibly", "all questions are compulsory",
+            "duration:", "marks:", "candidate name", "institution", "college", "roll number",
+            "instructions:", "faculty panel", "class:", "date:"
+        ]):
+            continue
             
-        if is_numbered:
-            # Save preceding question
+        # Check if line matches a question
+        match = q_re.match(stripped)
+        if match:
+            q_text = match.group(1).strip()
+            # Clean marks if embedded in prompt text, e.g. "[5 Marks]"
+            marks_match = re.search(r'\[(\d+)\s*Marks?\]', q_text, re.IGNORECASE)
+            q_marks = int(marks_match.group(1)) if marks_match else 5
+            
+            # Filter out instructions matching question regex format (e.g. "1. Read carefully")
+            q_text_lower = q_text.lower()
+            if any(ins in q_text_lower for ins in ["read all", "attempt all", "write legibly", "all questions are compulsory", "instructions:"]):
+                continue
+                
             if current_question:
                 questions.append(current_question)
                 
-            q_text = stripped[prefix_len:].strip()
-            # Simple heuristic for type
             q_type = "paragraph"
             lower_text = q_text.lower()
             if "choose" in lower_text or "mcq" in lower_text or "multiple choice" in lower_text:
                 q_type = "multiple_choice"
             elif "true or false" in lower_text or "true/false" in lower_text:
                 q_type = "true_false"
-            elif "short answer" in lower_text or "[1 mark" in lower_text or "[2 mark" in lower_text:
+            elif "short answer" in lower_text or q_marks <= 2:
                 q_type = "short_answer"
                 
             current_question = {
                 "question": q_text,
                 "type": q_type,
                 "section": current_section,
+                "max_marks": q_marks,
                 "choices": []
             }
-        elif current_question and (stripped.startswith(("-", "*", "a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)", "[ ]", "( )"))):
+        elif current_question and (stripped.startswith(("-", "*", "a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)", "[ ]", "( )", "a.", "b.", "c.", "d.", "A.", "B.", "C.", "D."))):
             choice_text = stripped
-            for pref in ["a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)", "-", "*", "[ ]", "( )"]:
+            # Avoid matching headers starting with bold *
+            if choice_text.replace("*", "").strip().lower().startswith("section"):
+                continue
+            for pref in ["a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)", "a.", "b.", "c.", "d.", "A.", "B.", "C.", "D.", "-", "*", "[ ]", "( )"]:
                 if choice_text.startswith(pref):
                     choice_text = choice_text[len(pref):].strip()
                     break
-            current_question["choices"].append(choice_text)
-            current_question["type"] = "multiple_choice"
-            
+            # Remove trailing/leading asterisks from option
+            choice_text = choice_text.replace("*", "").strip()
+            if choice_text:
+                current_question["choices"].append(choice_text)
+                current_question["type"] = "multiple_choice"
+                
     if current_question:
         questions.append(current_question)
         
