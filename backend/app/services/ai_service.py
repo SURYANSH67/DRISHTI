@@ -110,9 +110,9 @@ class AIService:
         if self.groq_client:
             try:
                 # Map standard message formats
-                # Use llama-3.3-70b-specdec on Groq
+                # Use llama-3.3-70b-versatile on Groq
                 kwargs = {
-                    "model": "llama-3.3-70b-specdec",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": messages,
                     "temperature": temperature
                 }
