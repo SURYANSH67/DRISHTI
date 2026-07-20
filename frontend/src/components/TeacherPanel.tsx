@@ -2097,26 +2097,28 @@ export default function TeacherPanel({
 
                           {/* Student Submissions Table */}
                           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto shadow-sm w-full">
-                            <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                            <table className="w-full text-left text-xs border-collapse">
                               <thead>
                                 <tr className="bg-slate-100/50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800">
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Student Name</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] whitespace-nowrap">Time Submitted</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Score</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Percentage</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right min-w-[130px]">Actions</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] w-[120px]">Student Name</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] whitespace-nowrap w-[90px]">Submitted</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] w-[60px]">Score</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] w-[60px]">Percentage</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right w-[110px]">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                                 {formResponses.map((res) => (
                                   <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td 
-                                      className="p-3 font-extrabold text-slate-700 dark:text-slate-300 max-w-[130px] truncate"
+                                      className="p-3 font-extrabold text-slate-700 dark:text-slate-300 max-w-[120px] truncate"
                                       title={res.student_name}
                                     >
                                       {res.student_name}
                                     </td>
-                                    <td className="p-3 text-slate-400 text-[10px] whitespace-nowrap">{res.submission_time}</td>
+                                    <td className="p-3 text-slate-400 text-[10px] whitespace-nowrap">
+                                      {res.submission_time && res.submission_time.length > 16 ? res.submission_time.substring(5, 16) : res.submission_time}
+                                    </td>
                                     <td className="p-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                                       {Number(res.marks_obtained).toFixed(1).replace(/\.0$/, "")} / {res.total_marks}
                                     </td>
