@@ -617,18 +617,22 @@ async def convert_to_google_form(paper_id: str, request: ConvertFormRequest):
                 "teacher_email": request.teacher_email,
                 "questions": questions_list
             }
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 resp = await client.post(request.apps_script_url.strip(), json=payload, follow_redirects=True)
-                res_data = resp.json()
-                if res_data.get("status") == "success":
-                    form_url = res_data.get("form_url")
-                    meta["google_form_id"] = res_data.get("form_id")
+                if resp.status_code == 200:
+                    try:
+                        res_data = resp.json()
+                        if res_data.get("status") == "success":
+                            form_url = res_data.get("form_url")
+                            meta["google_form_id"] = res_data.get("form_id")
+                        else:
+                            print(f"Apps Script returned failure status: {res_data.get('message')}. Using local fallback.")
+                    except Exception as json_err:
+                        print(f"Apps Script response is not valid JSON (HTML/Redirect page received): {json_err}. Using local fallback.")
                 else:
-                    raise HTTPException(status_code=502, detail=f"Apps Script Error: {res_data.get('message')}")
+                    print(f"Apps Script returned status code {resp.status_code}. Using local fallback.")
         except Exception as e:
-            if isinstance(e, HTTPException):
-                raise e
-            raise HTTPException(status_code=500, detail=f"Apps Script Connection Failed: {str(e)}")
+            print(f"Apps Script Connection Failed: {e}. Using local fallback.")
             
     meta["google_form_url"] = form_url
     
