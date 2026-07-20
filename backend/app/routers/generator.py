@@ -362,16 +362,23 @@ INSTRUCTIONS FOR TEACHER ANSWER KEY:
    - Topic/Chapter origin.
    - Learning outcome.
 
-You MUST return your response in this exact JSON structure:
-{{
-  "student_paper": "YOUR_EXAM_PAPER_MARKDOWN_HERE",
-  "answer_key": "YOUR_TEACHER_ANSWER_KEY_MARKDOWN_HERE"
-}}
-Return ONLY the raw JSON object. Do not wrap in markdown code blocks or add conversational prefix/suffix.
+You MUST wrap the Student Exam Paper (questions only) inside [STUDENT_PAPER_START] and [STUDENT_PAPER_END] tags.
+You MUST wrap the Teacher Answer Key inside [ANSWER_KEY_START] and [ANSWER_KEY_END] tags.
+
+Example output structure:
+[STUDENT_PAPER_START]
+# EXAM PAPER CONTENT
+...
+[STUDENT_PAPER_END]
+
+[ANSWER_KEY_START]
+# ANSWER KEY CONTENT
+...
+[ANSWER_KEY_END]
 """
 
     messages = [
-        {"role": "system", "content": "You are a senior university professor and exam board setter. You build rigorous, professional question papers with clean section distributions and exact answer keys. You respond ONLY in valid JSON format as specified."},
+        {"role": "system", "content": "You are a senior university professor and exam board setter. You build rigorous, professional question papers with clean section distributions and exact answer keys. Wrap the student paper and answer key sections inside the requested tags [STUDENT_PAPER_START] and [ANSWER_KEY_START]."},
         {"role": "user", "content": paper_prompt}
     ]
 
@@ -384,32 +391,44 @@ Return ONLY the raw JSON object. Do not wrap in markdown code blocks or add conv
         
         student_content = ""
         answer_key = ""
-        try:
-            llm_out = content.strip()
-            if "```" in llm_out:
-                parts = llm_out.split("```")
-                for p in parts:
-                    p_clean = p.strip()
-                    if p_clean.startswith("{") or p_clean.startswith("json{") or p_clean.startswith("json\n{"):
-                        if p_clean.startswith("json"):
-                            p_clean = p_clean[4:].strip()
-                        llm_out = p_clean
-                        break
-            data = json.loads(llm_out.strip())
-            student_content = data.get("student_paper", "")
-            answer_key = data.get("answer_key", "")
-        except Exception as parse_err:
-            print(f"Failed to parse JSON response: {parse_err}")
+        
+        content_str = content.strip()
+        if "[STUDENT_PAPER_START]" in content_str and "[STUDENT_PAPER_END]" in content_str:
+            student_content = content_str.split("[STUDENT_PAPER_START]")[1].split("[STUDENT_PAPER_END]")[0].strip()
+        if "[ANSWER_KEY_START]" in content_str and "[ANSWER_KEY_END]" in content_str:
+            answer_key = content_str.split("[ANSWER_KEY_START]")[1].split("[ANSWER_KEY_END]")[0].strip()
+            
+        # Try fallback JSON parse if tags are missing or empty
+        if not student_content or not answer_key:
+            try:
+                llm_out = content_str
+                if "```" in llm_out:
+                    parts = llm_out.split("```")
+                    for p in parts:
+                        p_clean = p.strip()
+                        if p_clean.startswith("{") or p_clean.startswith("json{") or p_clean.startswith("json\n{"):
+                            if p_clean.startswith("json"):
+                                p_clean = p_clean[4:].strip()
+                            llm_out = p_clean
+                            break
+                data = json.loads(llm_out.strip())
+                student_content = data.get("student_paper", "")
+                answer_key = data.get("answer_key", "")
+            except Exception:
+                pass
+                
+        # Final fallback: split by headers
+        if not student_content or not answer_key:
             if "## ANSWER KEY" in content.upper():
                 parts = content.split("## ANSWER KEY")
-                student_content = parts[0]
-                answer_key = "## ANSWER KEY" + parts[1]
+                student_content = parts[0].replace("[STUDENT_PAPER_START]", "").replace("[STUDENT_PAPER_END]", "").strip()
+                answer_key = "## ANSWER KEY" + parts[1].replace("[ANSWER_KEY_START]", "").replace("[ANSWER_KEY_END]", "").strip()
             elif "ANSWER KEY" in content.upper():
                 parts = content.split("ANSWER KEY")
-                student_content = parts[0]
-                answer_key = "## ANSWER KEY\n" + parts[1]
+                student_content = parts[0].replace("[STUDENT_PAPER_START]", "").replace("[STUDENT_PAPER_END]", "").strip()
+                answer_key = "## ANSWER KEY\n" + parts[1].replace("[ANSWER_KEY_START]", "").replace("[ANSWER_KEY_END]", "").strip()
             else:
-                student_content = content
+                student_content = content.replace("[STUDENT_PAPER_START]", "").replace("[STUDENT_PAPER_END]", "").strip()
                 answer_key = "# Teacher Answer Key & Solutions\n\nNo separate key generated."
 
         # Persist generated question paper to database
