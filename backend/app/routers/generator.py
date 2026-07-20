@@ -859,36 +859,37 @@ async def get_form_responses(paper_id: str, apps_script_url: Optional[str] = Non
         quality = 0.9 - (idx * 0.08)
         
         for q in questions_list:
+            q_marks = q.get("max_marks", 5)
             q_lower = q["question"].lower()
             if "mutual exclusion" in q_lower:
                 if quality > 0.8:
                     ans = "Mutual exclusion means resources can only be held by one process at a time. If another process wants it, it must wait until it is released."
-                    score = q["max_marks"]
+                    score = q_marks
                     feedback = "Excellent explanation of resource lock exclusivity."
                 elif quality > 0.6:
                     ans = "Mutual exclusion is where resources are exclusive, meaning only one process can run on a resource."
-                    score = int(q["max_marks"] * 0.8)
+                    score = int(q_marks * 0.8)
                     feedback = "Good description, but could clarify process hold locks."
                 else:
                     ans = "Processes wait in a queue for resources."
-                    score = int(q["max_marks"] * 0.4)
+                    score = int(q_marks * 0.4)
                     feedback = "Weak description. Fails to define the closed dependency loop."
             else:
                 if quality > 0.8:
                     ans = "This is fully described in the chapter context. All criteria are correctly evaluated and satisfied."
                     feedback = "Very complete and conceptually accurate response."
-                    score = q["max_marks"]
+                    score = q_marks
                 else:
                     ans = "Partial answer describing the basic definition from textbook."
                     feedback = "Completed basic criteria, but missing crucial derivation details."
-                    score = int(q["max_marks"] * 0.7)
+                    score = int(q_marks * 0.7)
 
             total_score += score
-            total_possible += q["max_marks"]
+            total_possible += q_marks
             question_analysis.append({
-                "section": q["section"],
+                "section": q.get("section", "Section"),
                 "question": q["question"],
-                "max_marks": q["max_marks"],
+                "max_marks": q_marks,
                 "student_answer": ans,
                 "score_obtained": score,
                 "feedback": feedback
