@@ -2096,26 +2096,26 @@ export default function TeacherPanel({
                           </div>
 
                           {/* Student Submissions Table */}
-                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                            <table className="w-full text-left text-xs border-collapse">
+                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto shadow-sm w-full">
+                            <table className="w-full text-left text-xs border-collapse min-w-[600px]">
                               <thead>
                                 <tr className="bg-slate-100/50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800">
                                   <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Student Name</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Time Submitted</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] whitespace-nowrap">Time Submitted</th>
                                   <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Score</th>
                                   <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Percentage</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right">Actions</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right min-w-[130px]">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                                 {formResponses.map((res) => (
                                   <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="p-3 font-extrabold text-slate-700 dark:text-slate-300">{res.student_name}</td>
-                                    <td className="p-3 text-slate-400 text-[10px]">{res.submission_time}</td>
-                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                                    <td className="p-3 font-extrabold text-slate-700 dark:text-slate-300 break-all max-w-[180px]">{res.student_name}</td>
+                                    <td className="p-3 text-slate-400 text-[10px] whitespace-nowrap">{res.submission_time}</td>
+                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                                       {res.marks_obtained} / {res.total_marks}
                                     </td>
-                                    <td className="p-3">
+                                    <td className="p-3 whitespace-nowrap">
                                       <span className={`font-bold ${
                                         res.overall_percentage >= 80 
                                           ? "text-emerald-600" 
@@ -2126,7 +2126,7 @@ export default function TeacherPanel({
                                         {res.overall_percentage.toFixed(1)}%
                                       </span>
                                     </td>
-                                    <td className="p-3">
+                                    <td className="p-3 text-right">
                                       <div className="flex justify-end gap-1.5 whitespace-nowrap">
                                         <button
                                           onClick={() => setViewingResponseDetail(res)}
