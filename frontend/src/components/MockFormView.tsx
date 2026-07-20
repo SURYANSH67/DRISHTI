@@ -47,14 +47,25 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
     let currentQ: any = null;
     let currentSection = "General";
 
+    let skipSection = false;
+
     lines.forEach((line) => {
       const stripped = line.trim();
       if (!stripped) return;
 
-      if (stripped.startsWith("## Section") || stripped.startsWith("Section")) {
-        currentSection = stripped.replace("##", "").trim();
+      if (stripped.startsWith("#") || (stripped.startsWith("Section") && stripped.includes(":")) || stripped.toLowerCase().startsWith("section")) {
+        const secName = stripped.replace(/#/g, "").trim();
+        const secLower = secName.toLowerCase();
+        if (secLower.includes("answer") || secLower.includes("key") || secLower.includes("solution") || secLower.includes("grading")) {
+          skipSection = true;
+        } else {
+          skipSection = false;
+          currentSection = secName;
+        }
         return;
       }
+
+      if (skipSection) return;
 
       // Check if numbered list item
       let isNumbered = false;

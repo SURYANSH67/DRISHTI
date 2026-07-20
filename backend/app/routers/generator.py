@@ -448,20 +448,30 @@ import httpx
 
 class ConvertFormRequest(BaseModel):
     apps_script_url: Optional[str] = None
+    teacher_email: Optional[str] = None
 
 def parse_questions_from_markdown(markdown_content: str) -> list:
     questions = []
     lines = markdown_content.split("\n")
     current_question = None
     current_section = "General"
+    skip_current_section = False
     
     for line in lines:
         stripped = line.strip()
         if not stripped:
             continue
         
-        if stripped.startswith("## Section") or stripped.startswith("Section"):
-            current_section = stripped.replace("##", "").strip()
+        if stripped.startswith("#") or (stripped.startswith("Section") and ":" in stripped) or stripped.lower().startswith("section"):
+            current_section = stripped.replace("#", "").strip()
+            sec_lower = current_section.lower()
+            if any(term in sec_lower for term in ["answer", "solution", "key", "grading"]):
+                skip_current_section = True
+            else:
+                skip_current_section = False
+            continue
+            
+        if skip_current_section:
             continue
             
         # Check if line matches a numbered item: "1. What is...", "Q1. ...", "1) ..."
@@ -540,7 +550,8 @@ async def convert_to_google_form(paper_id: str, request: ConvertFormRequest):
             payload = {
                 "action": "create_form",
                 "title": paper["title"],
-                "questions": parsed_questions
+                "questions": parsed_questions,
+                "teacher_email": request.teacher_email
             }
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(request.apps_script_url.strip(), json=payload, follow_redirects=True)

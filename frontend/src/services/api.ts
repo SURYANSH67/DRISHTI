@@ -247,13 +247,16 @@ export const api = {
     return res.json();
   },
 
-  async convertPaperToGoogleForm(paperId: string, appsScriptUrl?: string): Promise<any> {
+  async convertPaperToGoogleForm(paperId: string, appsScriptUrl?: string, sharingEmail?: string): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/google-form`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ apps_script_url: appsScriptUrl })
+      body: JSON.stringify({ 
+        apps_script_url: appsScriptUrl,
+        teacher_email: sharingEmail
+      })
     });
     if (!res.ok) throw new Error("Failed to convert paper to Google Form");
     return res.json();
