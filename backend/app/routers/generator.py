@@ -803,22 +803,28 @@ async def get_form_responses(paper_id: str, apps_script_url: Optional[str] = Non
                 else:
                     try:
                         grade_prompt = f"""
-                        You are an expert academic grader. Compare the student's answer with the reference textbook context AND the official teacher's answer key solutions/marking scheme.
-                        Assign a score out of {q_marks} based on correctness, accuracy, and coverage of key concepts.
-                        
-                        Question: {q['question']}
-                        Max Marks: {q_marks}
-                        Student's Answer: {matched_ans}
-                        Official Teacher Answer Key Reference: {answer_key}
-                        Textbook RAG Reference Context: {textbook_ref or "Use general technical knowledge if context is not available."}
-                        
-                        Provide your feedback in this exact JSON format:
-                        {{
-                          "score": 4.0, // Numeric value out of {q_marks}
-                          "feedback": "Concise feedback describing accuracy, mistakes, and missing elements"
-                        }}
-                        Return only raw JSON.
-                        """
+You are a senior academic evaluator grading university examinations. Compare the student's answer with the reference textbook context AND the official teacher's answer key solutions/marking scheme.
+Grade with high academic rigor and absolute accuracy.
+
+GRADING PRINCIPLES:
+1. Fact-based Grading: The answer must align strictly with the Textbook RAG Context. Deduct marks for factual errors, misconceptions, or incorrect definitions.
+2. Concept & Keyword Coverage: Look for essential technical terms and explanations matching the question.
+3. Strictness: Be strict and professional. Do not award full marks for incomplete, vague, or extremely brief answers.
+4. Granular Score: Assign a precise numeric score out of {q_marks}. Use decimals (e.g. 1.5, 3.5, 4.0) to reflect the exact level of completion.
+
+Question: {q['question']}
+Max Marks: {q_marks}
+Student's Answer: {matched_ans}
+Official Teacher Answer Key Reference: {answer_key}
+Textbook RAG Reference Context: {textbook_ref or "Use general technical knowledge if context is not available."}
+
+Provide your feedback in this exact JSON format:
+{{
+  "score": 4.0, // Numeric value out of {q_marks} (between 0.0 and {q_marks})
+  "feedback": "Constructive, professional feedback explaining what key facts were correct, what elements were missing compared to the textbook, and any specific errors made."
+}}
+Return only raw JSON.
+"""
                         llm_out = ai_service.chat_completion([{"role": "user", "content": grade_prompt}], temperature=0.1)
                         if "```" in llm_out:
                             llm_out = llm_out.split("```")[1]

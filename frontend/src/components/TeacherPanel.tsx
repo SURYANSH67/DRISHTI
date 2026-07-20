@@ -1998,7 +1998,7 @@ export default function TeacherPanel({
                                 </html>
                               `);
                             }}
-                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold rounded text-[10px] transition-colors cursor-pointer"
                           >
                             Student Paper PDF
                           </button>
@@ -2029,7 +2029,7 @@ export default function TeacherPanel({
                                 </html>
                               `);
                             }}
-                            className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 border border-indigo-200 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 border border-indigo-200 font-bold rounded text-[10px] transition-colors cursor-pointer"
                           >
                             Answer Key PDF
                           </button>
@@ -2037,13 +2037,13 @@ export default function TeacherPanel({
                             <>
                               <button
                                 onClick={() => alert("Excel Export Complete. Saved: 'Drishti_Evaluated_Report.xlsx'")}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] transition-colors cursor-pointer shadow shadow-emerald-600/10"
                               >
                                 Export Excel
                               </button>
                               <button
                                 onClick={() => alert("PDF Report card exported to download directory.")}
-                                className="px-2.5 py-1 bg-purple-650 hover:bg-purple-755 text-white font-bold rounded text-[10px] transition-colors cursor-pointer shadow shadow-purple-600/10"
+                                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded text-[10px] transition-colors cursor-pointer shadow shadow-purple-600/10"
                               >
                                 Export PDF
                               </button>
@@ -2126,22 +2126,24 @@ export default function TeacherPanel({
                                         {res.overall_percentage.toFixed(1)}%
                                       </span>
                                     </td>
-                                    <td className="p-3 text-right space-x-2">
-                                      <button
-                                        onClick={() => setViewingResponseDetail(res)}
-                                        className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
-                                      >
-                                        Analysis
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setGradingResponseId(res.id);
-                                          setOverrideMarksVal(res.marks_obtained);
-                                        }}
-                                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
-                                      >
-                                        Override
-                                      </button>
+                                    <td className="p-3">
+                                      <div className="flex justify-end gap-1.5 whitespace-nowrap">
+                                        <button
+                                          onClick={() => setViewingResponseDetail(res)}
+                                          className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                                        >
+                                          Analysis
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setGradingResponseId(res.id);
+                                            setOverrideMarksVal(res.marks_obtained);
+                                          }}
+                                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                                        >
+                                          Override
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
