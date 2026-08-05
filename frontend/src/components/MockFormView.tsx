@@ -56,7 +56,14 @@ export default function MockFormView({ paperId }: MockFormViewProps) {
       if (stripped.startsWith("#") || (stripped.startsWith("Section") && stripped.includes(":")) || stripped.toLowerCase().startsWith("section")) {
         const secName = stripped.replace(/#/g, "").trim();
         const secLower = secName.toLowerCase();
-        if (secLower.includes("answer") || secLower.includes("key") || secLower.includes("solution") || secLower.includes("grading")) {
+        if (
+          secLower.includes("answer key") || 
+          secLower.includes("teacher answer") || 
+          secLower.includes("solutions") || 
+          secLower.includes("solution key") || 
+          secLower.includes("model answer") || 
+          secLower.includes("grading key")
+        ) {
           skipSection = true;
         } else {
           skipSection = false;

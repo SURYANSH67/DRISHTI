@@ -561,7 +561,7 @@ def parse_questions_from_markdown(markdown_content: str) -> list:
                 current_question = None
             current_section = clean_line
             sec_lower = current_section.lower()
-            if any(term in sec_lower for term in ["answer", "solution", "key", "grading"]):
+            if any(term in sec_lower for term in ["answer key", "teacher answer", "solutions", "solution key", "model answer", "grading key"]):
                 skip_current_section = True
             else:
                 skip_current_section = False
