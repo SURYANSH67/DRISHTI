@@ -358,9 +358,16 @@ INSTRUCTIONS FOR STUDENT EXAM PAPER:
    - Answer all questions matching your section pattern.
    - Write legibly and clearly.
    ***
-2. Use clear section headers starting with "## " (e.g. "## Section A: MCQs (5 Marks)", "## Section B: Short Answer Questions").
+2. Use clear section headers starting with "## " (e.g. "## Section A: MCQs (10 Marks)", "## Section B: Short Answer Questions (20 Marks)").
 3. For each question, display marks clearly in brackets (e.g., "[1 Mark]" or "[5 Marks]").
 4. DO NOT include any answers, solutions, hints, or explanations in the student exam paper.
+5. Every question in every section MUST be numbered (e.g., "1. What is...", "2. Which...", "3. Explain..."). Do NOT use bullet points (- or *) to list questions.
+6. For every Multiple Choice Question (MCQ) in the MCQ section, you MUST list four choices labeled with letters (A, B, C, D) directly below the question. Example format:
+   1. What is the default port for HTTP? [1 Mark]
+   A. 80
+   B. 443
+   C. 8080
+   D. 22
 
 INSTRUCTIONS FOR TEACHER ANSWER KEY:
 1. Start with a clean header:
@@ -593,9 +600,12 @@ def parse_questions_from_markdown(markdown_content: str) -> list:
             if current_question:
                 questions.append(current_question)
                 
+            sec_lower = current_section.lower()
+            is_mcq_section = "mcq" in sec_lower or "multiple choice" in sec_lower
+            
             q_type = "paragraph"
             lower_text = q_text.lower()
-            if "choose" in lower_text or "mcq" in lower_text or "multiple choice" in lower_text:
+            if is_mcq_section or "choose" in lower_text or "mcq" in lower_text or "multiple choice" in lower_text:
                 q_type = "multiple_choice"
             elif "true or false" in lower_text or "true/false" in lower_text:
                 q_type = "true_false"
@@ -609,7 +619,7 @@ def parse_questions_from_markdown(markdown_content: str) -> list:
                 "max_marks": q_marks,
                 "choices": []
             }
-        elif current_question and (stripped.startswith(("-", "*", "a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)", "[ ]", "( )", "a.", "b.", "c.", "d.", "A.", "B.", "C.", "D."))):
+        elif current_question and current_question["type"] == "multiple_choice" and (stripped.startswith(("-", "*", "a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)", "[ ]", "( )", "a.", "b.", "c.", "d.", "A.", "B.", "C.", "D."))):
             choice_text = stripped
             # Avoid matching headers starting with bold *
             if choice_text.replace("*", "").strip().lower().startswith("section"):
@@ -622,7 +632,6 @@ def parse_questions_from_markdown(markdown_content: str) -> list:
             choice_text = choice_text.replace("*", "").strip()
             if choice_text:
                 current_question["choices"].append(choice_text)
-                current_question["type"] = "multiple_choice"
                 
     if current_question:
         questions.append(current_question)
