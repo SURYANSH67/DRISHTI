@@ -917,6 +917,11 @@ Return only raw JSON.
         return results
 
     # Fallback to high-fidelity simulated response records using database answer_key
+    # ONLY if this is NOT a real Google Form paper
+    if meta.get("google_form_id"):
+        conn.close()
+        return []
+
     questions_list = parse_questions_from_markdown(student_content)
     if not questions_list:
         questions_list = [
