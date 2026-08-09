@@ -209,11 +209,24 @@ OPENAI_API_KEY=your_openai_api_key (optional fallback)
 ```
 
 ### 3. Startup & Service Execution
-Launch both FastAPI (Port `8000`) and Vite dev server (Port `5173`) in one command using the startup wrapper:
+
+#### Option A: Run Locally (Dev Mode)
+To launch both the FastAPI backend (Port `8000`) and Vite dev server (Port `5173`) simultaneously:
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
+
+#### Option B: Expose Globally (Tunnel Mode for Students)
+To share the interactive portal online so that students can attempt forms and submit evaluations:
+1. Make sure the backend server is running.
+2. In a separate terminal session, run the auto-reconnecting Pinggy tunnel daemon:
+```bash
+chmod +x run_tunnel.sh
+./run_tunnel.sh
+```
+This will print a secure public HTTPS URL (e.g. `https://xxxx.run.pinggy-free.link`) that you can share with your students!
+
 
 ### 4. Running Offline Verifications
 To verify offline embedding and local macOS Vision OCR performance:
