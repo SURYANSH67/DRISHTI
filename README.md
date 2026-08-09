@@ -30,43 +30,40 @@ Traditional AI grading often suffers from model hallucinations, loose scoring cr
 ## 🏗️ System Architecture
 
 ```mermaid
-graph TD
-    %% Frontend UI
-    subgraph Frontend (React + Vite + Tailwind)
-        UI[Faculty & Student Portal]
-        GenTab[Paper Generator]
-        EvalTab[Evaluation Dashboard]
-        KDeskTab[Knowledge Desk]
+flowchart TD
+    subgraph Frontend["Frontend Layer (React + Vite + Tailwind)"]
+        UI["Faculty & Student Portal"]
+        GenTab["Paper Generator"]
+        EvalTab["Evaluation Dashboard"]
+        KDeskTab["Knowledge Desk"]
     end
 
-    %% Backend Server
-    subgraph Backend (FastAPI Python Engine)
-        API[FastAPI Router System]
-        DB[(SQLite Database)]
+    subgraph Backend["Backend Layer (FastAPI Python Engine)"]
+        API["FastAPI Router System"]
+        DB[("SQLite Database")]
         
-        subgraph RAG & Knowledge Engine
-            VectorStore[(Dimension-Aware Vector Store)]
-            TextbookParser[PDF Layout & Chapter Parser]
-            Embedder[Online Gemini / Offline SentenceTransformers]
+        subgraph RAG["RAG & Knowledge Engine"]
+            VectorStore[("Dimension-Aware Vector Store")]
+            TextbookParser["PDF Layout & Chapter Parser"]
+            Embedder["Online Gemini / Offline SentenceTransformers"]
         end
 
-        subgraph Evaluation & Scoring Pipeline
-            BatchGrader[Batched LLM Evaluator]
-            AnswerKeyParser[Per-Question Answer Key Matcher]
-            LearningEngine[Continuous Learning Ingestion]
+        subgraph Evaluation["Evaluation & Scoring Pipeline"]
+            BatchGrader["Batched LLM Evaluator"]
+            AnswerKeyParser["Per-Question Answer Key Matcher"]
+            LearningEngine["Continuous Learning Ingestion"]
         end
     end
 
-    %% User Interactions
-    UI -->|Generate / Grade Requests| API
-    TextbookParser -->|Index Textbook Slices| VectorStore
-    API -->|Fetch Context| VectorStore
-    API -->|Parse Answer Keys| AnswerKeyParser
-    AnswerKeyParser -->|Structured Context| BatchGrader
-    BatchGrader -->|Ingest High Scorers| LearningEngine
-    LearningEngine -->|Persist Learnings| DB
-    LearningEngine -->|Index Vectors| VectorStore
-    API -->|Store & Fetch Papers/Responses| DB
+    UI -->|"Generate / Grade Requests"| API
+    TextbookParser -->|"Index Textbook Slices"| VectorStore
+    API -->|"Fetch Context"| VectorStore
+    API -->|"Parse Answer Keys"| AnswerKeyParser
+    AnswerKeyParser -->|"Structured Context"| BatchGrader
+    BatchGrader -->|"Ingest High Scorers"| LearningEngine
+    LearningEngine -->|"Persist Learnings"| DB
+    LearningEngine -->|"Index Vectors"| VectorStore
+    API -->|"Store & Fetch Papers/Responses"| DB
 ```
 
 ---
