@@ -1192,3 +1192,18 @@ async def submit_mock_form(paper_id: str, request: MockSubmissionRequest):
     conn.commit()
     conn.close()
     return {"status": "success", "response_id": response_id}
+
+@router.delete("/papers/{paper_id}")
+async def delete_question_paper(paper_id: str):
+    """Deletes a question paper and all its associated form responses from the database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM form_responses WHERE paper_id = ?", (paper_id,))
+        cursor.execute("DELETE FROM question_papers WHERE id = ?", (paper_id,))
+        conn.commit()
+        return {"status": "success", "message": "Question paper deleted successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete question paper: {str(e)}")
+    finally:
+        conn.close()

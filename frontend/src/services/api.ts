@@ -249,6 +249,17 @@ export const api = {
     return res.json();
   },
 
+  async deleteQuestionPaper(paperId: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || "Failed to delete question paper");
+    }
+    return res.json();
+  },
+
   async convertPaperToGoogleForm(paperId: string, appsScriptUrl?: string, sharingEmail?: string): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/google-form`, {
       method: "POST",

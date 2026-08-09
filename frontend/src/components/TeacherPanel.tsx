@@ -375,6 +375,21 @@ export default function TeacherPanel({
     }
   };
 
+  const handleDeletePaper = async (paperId: string) => {
+    if (!window.confirm("Are you sure you want to delete this question paper? This will permanently delete the paper and all associated student evaluations.")) return;
+    try {
+      await api.deleteQuestionPaper(paperId);
+      alert("Question paper deleted successfully!");
+      if (selectedPaper?.id === paperId) {
+        setSelectedPaper(null);
+        setFormResponses([]);
+      }
+      await fetchPapers();
+    } catch (err: any) {
+      alert("Failed to delete paper: " + err.message);
+    }
+  };
+
   const [fetchingError, setFetchingError] = useState<string | null>(null);
 
   const handleFetchResponses = async (paper: any) => {
@@ -1725,7 +1740,7 @@ export default function TeacherPanel({
                           onClick={() => setPreviewMode("student")}
                           className={`px-3 py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
                             previewMode === "student"
-                              ? "bg-white text-indigo-650 shadow shadow-indigo-650/10"
+                              ? "bg-white text-indigo-600 shadow shadow-indigo-600/10"
                               : "text-slate-500 hover:text-slate-700"
                           }`}
                         >
@@ -1753,7 +1768,7 @@ export default function TeacherPanel({
                       </button>
                       <button
                         onClick={handleDownloadPDF}
-                        className="px-3 py-1.5 bg-purple-650 hover:bg-purple-755 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-purple-600/10"
+                        className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-purple-600/10"
                         title="Save or print as structured PDF"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -1768,7 +1783,7 @@ export default function TeacherPanel({
                           setActiveSubTab("forms");
                         }}
                         disabled={convertingPaperId === generatedPaperId}
-                        className="px-3 py-1.5 bg-indigo-655 hover:bg-indigo-755 disabled:bg-indigo-400 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-indigo-650/10"
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow shadow-indigo-600/10"
                         title="Create interactive assessment form link"
                       >
                         {convertingPaperId === generatedPaperId ? (
@@ -1896,10 +1911,22 @@ export default function TeacherPanel({
                             }`}
                           >
                             <div className="flex justify-between items-start gap-2">
-                              <span className="font-extrabold text-slate-700 dark:text-slate-200 leading-snug">{paper.title}</span>
-                              <span className="shrink-0 text-[9px] bg-slate-100 dark:bg-slate-850 text-slate-500 font-bold px-1.5 py-0.5 rounded">
-                                {paper.metadata?.total_marks} M
-                              </span>
+                              <span className="font-extrabold text-slate-700 dark:text-slate-200 leading-snug flex-1">{paper.title}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[9px] bg-slate-100 dark:bg-slate-850 text-slate-500 font-bold px-1.5 py-0.5 rounded">
+                                  {paper.metadata?.total_marks} M
+                                </span>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await handleDeletePaper(paper.id);
+                                  }}
+                                  className="p-1 hover:bg-red-50 hover:text-red-650 dark:hover:bg-red-950/30 rounded text-slate-400 transition-colors cursor-pointer"
+                                  title="Delete question paper"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
 
                             <div className="text-[10px] text-slate-400 mt-1 font-semibold flex flex-wrap gap-x-2 gap-y-0.5">
@@ -2071,7 +2098,7 @@ export default function TeacherPanel({
                               href={selectedPaper.google_form_url.startsWith("http") ? selectedPaper.google_form_url : window.location.origin + selectedPaper.google_form_url} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="flex-1 sm:flex-none text-center px-3 py-1.5 bg-purple-650 hover:bg-purple-750 text-white font-extrabold rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm shadow-purple-600/15"
+                              className="flex-1 sm:flex-none text-center px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm shadow-purple-600/15"
                             >
                               Open Form
                             </a>
@@ -2253,7 +2280,7 @@ export default function TeacherPanel({
                               overall_percentage: (overrideMarksVal / prev.total_marks) * 100
                             }));
                           }}
-                          className="px-2.5 py-1 bg-indigo-650 hover:bg-indigo-750 text-white font-extrabold rounded-lg text-[9px] transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-lg text-[9px] transition-colors cursor-pointer"
                         >
                           Save Override
                         </button>
@@ -2332,7 +2359,7 @@ export default function TeacherPanel({
                     </button>
                     <button 
                       onClick={() => handleOverrideMarks(gradingResponseId, overrideMarksVal)}
-                      className="flex-1 py-2 bg-purple-650 hover:bg-purple-750 text-white font-bold rounded-lg text-xs cursor-pointer text-center"
+                      className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs cursor-pointer text-center"
                     >
                       Save Override
                     </button>
