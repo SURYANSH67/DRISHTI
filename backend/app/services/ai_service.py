@@ -106,6 +106,8 @@ class AIService:
         response_format: Optional[Dict[str, Any]] = None
     ) -> str:
         """Generate text completions using Groq (primary), Gemini (secondary), or OpenAI (fallback)."""
+        errors = []
+        
         # 1. Try Groq (Llama-3.3) for lightning-fast text generation
         if self.groq_client:
             try:
@@ -123,6 +125,7 @@ class AIService:
                 response = self.groq_client.chat.completions.create(**kwargs)
                 return response.choices[0].message.content or ""
             except Exception as e:
+                errors.append(f"Groq (Rate Limit/Quota): {str(e)}")
                 print(f"Groq chat completion failed: {e}. Falling back...")
 
         # 2. Try Gemini (gemini-2.5-flash)
@@ -147,6 +150,7 @@ class AIService:
                         print(f"Gemini rate limit 429 hit, retrying in 2.5 seconds (attempt {attempt + 1})...")
                         time.sleep(2.5)
                         continue
+                    errors.append(f"Gemini (Rate Limit/Quota): {str(e)}")
                     print(f"Gemini chat completion failed: {e}. Falling back...")
                     break
 
@@ -163,9 +167,12 @@ class AIService:
                 response = self.openai_client.chat.completions.create(**kwargs)
                 return response.choices[0].message.content or ""
             except Exception as e:
+                errors.append(f"OpenAI Key Error: {str(e)}")
                 print(f"OpenAI chat completion failed: {e}")
-                return f"Error: All completion APIs failed. {str(e)}"
 
+        if errors:
+            err_details = " | ".join(errors)
+            return f"Error: All completion APIs failed. Details: {err_details}"
         return "Error: No LLM API keys configured. Please configure GEMINI_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY."
 
     def analyze_image(self, image_path: str, prompt: str) -> str:
