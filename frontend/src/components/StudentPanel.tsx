@@ -394,7 +394,9 @@ export default function StudentPanel({
                 className="w-full px-2 py-1 bg-white border border-slate-350 rounded text-xs text-slate-800 focus:outline-none focus:border-purple-500"
               >
                 {books.map(b => (
-                  <option key={b.book_id} value={b.book_id}>{b.filename}</option>
+                  <option key={b.book_id} value={b.book_id}>
+                    {b.subject_name ? b.subject_name.toUpperCase() : b.filename}
+                  </option>
                 ))}
               </select>
 
@@ -650,7 +652,7 @@ export default function StudentPanel({
               <div className="p-4 border-b border-slate-200 flex justify-between items-center">
                 <div>
                   <h3 className="font-extrabold text-lg text-slate-800">AI Chapter Tutor</h3>
-                  <p className="text-xs text-slate-500">Grounded exclusively in: <span className="text-purple-600 font-bold">{selectedBook?.filename || "No book selected"}</span></p>
+                  <p className="text-xs text-slate-500">Grounded exclusively in: <span className="text-purple-600 font-bold">{selectedBook?.subject_name || selectedBook?.filename || "No book selected"}</span></p>
                 </div>
                 <button onClick={() => setChatMessages([])} className="px-2.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold border border-slate-250 transition-colors">Clear</button>
               </div>
@@ -898,7 +900,7 @@ export default function StudentPanel({
                 ) : (
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800/60 rounded-xl text-[10px] text-slate-500 font-semibold leading-relaxed">
                     ℹ️ Reference answer will be automatically retrieved by querying the textbook: 
-                    <span className="text-purple-650 dark:text-purple-400 font-bold block mt-0.5 truncate">{selectedBook?.filename || "Active Textbook"}</span>
+                    <span className="text-purple-650 dark:text-purple-400 font-bold block mt-0.5 truncate">{selectedBook?.subject_name || selectedBook?.filename || "Active Textbook"}</span>
                   </div>
                 )}
                 <div>

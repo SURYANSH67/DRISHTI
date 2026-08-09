@@ -1,6 +1,11 @@
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+BASE_DIR_PATH = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR_PATH / ".env")
+load_dotenv(BASE_DIR_PATH.parent / ".env")
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")

@@ -147,7 +147,9 @@ export default function PipelineSandbox({
             >
               <option value="">-- Auto-detect / Global --</option>
               {books.map(b => (
-                <option key={b.book_id} value={b.book_id}>{b.filename}</option>
+                <option key={b.book_id} value={b.book_id}>
+                  {b.subject_name ? b.subject_name.toUpperCase() : b.filename}
+                </option>
               ))}
             </select>
           </div>

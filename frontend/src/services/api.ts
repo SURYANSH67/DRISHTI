@@ -260,6 +260,19 @@ export const api = {
     return res.json();
   },
 
+  async renameQuestionPaper(paperId: string, title: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/rename`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || "Failed to rename question paper");
+    }
+    return res.json();
+  },
+
   async convertPaperToGoogleForm(paperId: string, appsScriptUrl?: string, sharingEmail?: string): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/generator/papers/${paperId}/google-form`, {
       method: "POST",

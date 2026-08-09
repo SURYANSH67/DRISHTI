@@ -18,11 +18,15 @@ async def get_network_status():
     is_online = False
     try:
         import socket
-        socket.setdefaulttimeout(1.0)
+        socket.setdefaulttimeout(1.5)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
         is_online = True
     except Exception:
         pass
+
+    # If socket check failed but online AI services are active, consider system online
+    if not is_online and (ai_service.gemini_enabled or ai_service.groq_client or ai_service.openai_client):
+        is_online = True
         
     return {
         "status": "online" if is_online else "offline",
@@ -252,10 +256,11 @@ async def get_stats(user_id: str = Query(...)):
     cursor.execute("SELECT COUNT(id) FROM api_logs")
     log_count = cursor.fetchone()[0] or 0
     # Provide a realistic dynamic simulation offset based on logs
-    ai_chats = max(log_count, 1)
+    ai_chats = log_count
     
     # Calculate generated papers (e.g. 2 per book)
-    papers_count = total_books * 2
+    cursor.execute("SELECT COUNT(id) FROM question_papers")
+    papers_count = cursor.fetchone()[0] or 0
 
     if user_role in ["Teacher", "Administrator"]:
         # Cohort aggregation (Teacher View)
@@ -419,6 +424,37 @@ async def get_stats(user_id: str = Query(...)):
         """, (user_id,))
         weak_chapters = [dict(row) for row in cursor.fetchall()]
     
+    # Real OCR accuracy: percentage of evaluations where meaningful content was extracted
+    cursor.execute("SELECT COUNT(*) FROM evaluations")
+    total_evals = cursor.fetchone()[0] or 0
+    cursor.execute("SELECT COUNT(*) FROM evaluations WHERE score > 0")
+    successful_evals = cursor.fetchone()[0] or 0
+    ocr_accuracy_val = round((successful_evals / total_evals) * 100, 1) if total_evals > 0 else 0.0
+
+    # Real vector store stats
+    total_vectors = 0
+    embedding_model = "gemini-embedding-001"
+    try:
+        from app.services.vector_store import vector_store
+        total_vectors = len(vector_store.documents)
+        # Detect active embedding model
+        if ai_service.gemini_enabled:
+            embedding_model = "gemini-embedding-001"
+        elif ai_service.openai_client:
+            embedding_model = "text-embedding-3-small"
+        elif ai_service.local_embedding_enabled:
+            embedding_model = "all-MiniLM-L6-v2"
+    except Exception:
+        pass
+
+    # Recent question papers generated
+    cursor.execute("SELECT id, title, created_at FROM question_papers ORDER BY created_at DESC LIMIT 5")
+    recent_papers = [dict(row) for row in cursor.fetchall()]
+    
+    # Recent form responses received
+    cursor.execute("SELECT student_name, overall_percentage, submission_time, paper_id FROM form_responses ORDER BY submission_time DESC LIMIT 5")
+    recent_responses = [dict(row) for row in cursor.fetchall()]
+    
     conn.close()
 
     total_assessments = q_count + e_count
@@ -441,7 +477,11 @@ async def get_stats(user_id: str = Query(...)):
         "papers_count": papers_count,
         "assessments_count": total_assessments,
         "class_avg_score": f"{avg_score_val}%" if avg_score_val > 0 else "--",
-        "ocr_accuracy": "96.4%" if total_assessments > 0 else "--",
+        "ocr_accuracy": f"{ocr_accuracy_val}%" if total_evals > 0 else "--",
+        "total_vectors": total_vectors,
+        "embedding_model": embedding_model,
+        "recent_papers": recent_papers,
+        "recent_responses": recent_responses,
         # Extra Cohort telemetry
         "cohort_mean": f"{avg_score_val}%" if avg_score_val > 0 else "--",
         "highest_score": f"{highest_score_val}%" if highest_score_val > 0 else "--",

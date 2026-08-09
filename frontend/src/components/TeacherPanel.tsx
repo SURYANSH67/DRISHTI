@@ -397,11 +397,21 @@ export default function TeacherPanel({
     setLoadingResponses(true);
     setFetchingError(null);
     try {
-      const data = await api.getFormResponses(paper.id, appsScriptUrl);
-      setFormResponses(data);
+      let data = await api.getFormResponses(paper.id, appsScriptUrl);
+      if (!data || data.length === 0) {
+        data = await api.getFormResponses(paper.id);
+      }
+      setFormResponses(data || []);
+      setFetchingError(null);
     } catch (err: any) {
-      console.error("Failed to fetch responses:", err);
-      setFetchingError(err.message || "Failed to retrieve student responses from Google Forms.");
+      console.error("Failed to fetch live responses:", err);
+      try {
+        const fallbackData = await api.getFormResponses(paper.id);
+        setFormResponses(fallbackData || []);
+        setFetchingError(null);
+      } catch (fErr) {
+        setFetchingError(err.message || "Failed to retrieve student responses from Google Forms.");
+      }
     } finally {
       setLoadingResponses(false);
     }

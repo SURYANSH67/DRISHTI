@@ -68,6 +68,30 @@ class SimpleVectorStore:
         Search for top k most similar documents.
         Filters can match key-value pairs (e.g. {"book_id": "...", "chapter_number": 2})
         """
+        # Check for dimension mismatch on the filtered book documents
+        book_id = filter_metadata.get("book_id") if filter_metadata else None
+        if book_id:
+            active_dim = len(query_embedding)
+            mismatched_docs = []
+            for doc_id, doc in self.documents.items():
+                if doc.get("metadata", {}).get("book_id") == book_id:
+                    doc_emb = doc.get("embedding")
+                    if doc_emb and len(doc_emb) != active_dim:
+                        mismatched_docs.append(doc)
+            if mismatched_docs:
+                print(f"Self-healing {len(mismatched_docs)} mismatched chunks for book {book_id} on-demand...")
+                from app.services.ai_service import ai_service
+                texts = [doc.get("text", "") for doc in mismatched_docs]
+                try:
+                    new_embeddings = ai_service.get_embeddings_batch(texts)
+                    for doc, emb in zip(mismatched_docs, new_embeddings):
+                        if emb:
+                            doc["embedding"] = emb
+                    self.save()
+                    print(f"Self-healing for book {book_id} complete.")
+                except Exception as e:
+                    print(f"Self-healing failed for book {book_id}: {e}")
+
         results = []
         
         # Precompute query norm (should be 1.0 for OpenAI embeddings, but let's be safe)
