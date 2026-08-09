@@ -11,7 +11,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [books, setBooks] = useState<BookOverview[]>([]);
   const [selectedBookId, setSelectedBookId] = useState<string>("");
-  const [selectedChapterNum, setSelectedChapterNum] = useState<number | null>(null);
+  const [selectedChapterNum, setSelectedChapterNum] = useState<number | null>(0);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [networkStatus, setNetworkStatus] = useState<"online" | "offline">("online");
 

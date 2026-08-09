@@ -846,7 +846,7 @@ export default function TeacherPanel({
                 value={selectedBookId}
                 onChange={(e) => {
                   setSelectedBookId(e.target.value);
-                  setSelectedChapterNum(null);
+                  setSelectedChapterNum(0);
                 }}
                 className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
               >
@@ -859,11 +859,11 @@ export default function TeacherPanel({
                 <>
                   <label className="text-[10px] text-slate-500 block font-bold uppercase">Active Chapter:</label>
                   <select
-                    value={selectedChapterNum || ""}
-                    onChange={(e) => setSelectedChapterNum(e.target.value ? Number(e.target.value) : null)}
+                    value={selectedChapterNum === null ? 0 : selectedChapterNum}
+                    onChange={(e) => setSelectedChapterNum(e.target.value ? Number(e.target.value) : 0)}
                     className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-purple-500 font-semibold"
                   >
-                    <option value="">Entire Book</option>
+                    <option value="0">Entire Book</option>
                     {selectedBook.chapters.map((ch, idx) => (
                       <option key={idx} value={idx + 1}>Ch {idx + 1}: {ch.title.substring(0, 18)}...</option>
                     ))}
@@ -1535,8 +1535,8 @@ export default function TeacherPanel({
               <div>
                 <label className="text-[10px] font-bold text-slate-505 block mb-1 uppercase tracking-wide">Target Chapter</label>
                 <select
-                  value={selectedChapterNum === null ? "" : selectedChapterNum}
-                  onChange={(e) => setSelectedChapterNum(e.target.value === "" ? null : Number(e.target.value))}
+                  value={selectedChapterNum === null ? 0 : selectedChapterNum}
+                  onChange={(e) => setSelectedChapterNum(e.target.value === "" ? 0 : Number(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-350 rounded-xl text-xs text-slate-850 focus:outline-none focus:border-purple-500 font-semibold"
                 >
                   <option value="" disabled>Select Chapter...</option>
@@ -1711,8 +1711,8 @@ export default function TeacherPanel({
               {/* Generate Button */}
               <button
                 onClick={handleGeneratePaper}
-                disabled={generatingPaper || !selectedChapterNum || questionTypes.length === 0}
-                className="w-full py-3 bg-purple-600 hover:bg-purple-750 disabled:bg-slate-200 disabled:text-slate-400 font-extrabold text-white rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-600/10"
+                disabled={generatingPaper || selectedChapterNum === null || questionTypes.length === 0}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-400 font-extrabold text-white rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-600/10"
               >
                 {generatingPaper ? (
                   <>
@@ -1947,7 +1947,7 @@ export default function TeacherPanel({
                                     className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
                                   >
                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    Interactive Test Link
+                                    {paper.google_form_url.includes("docs.google.com") ? "Google Form Link" : "Local Test Link"}
                                   </a>
                                   <button
                                     onClick={(e) => {

@@ -402,10 +402,17 @@ Example output structure:
 
     try:
         content = ai_service.chat_completion(messages, temperature=0.4)
+        
+        # Clean subject name from metadata
+        raw_name = metadata.get("subject") or metadata.get("title") or metadata.get("filename") or "Subject"
+        if raw_name.endswith(".pdf"):
+            raw_name = raw_name[:-4]
+        subject_name = raw_name.replace("_", " ").replace("-", " ").strip().title()
+        
         if request.chapter_number > 0:
-            title = f"{request.exam_type} - Chapter {request.chapter_number} Question Paper ({request.total_marks} Marks)"
+            title = f"{subject_name} ({request.exam_type}) - Chapter {request.chapter_number} ({request.total_marks} Marks)"
         else:
-            title = f"{request.exam_type} - Entire Book Question Paper ({request.total_marks} Marks)"
+            title = f"{subject_name} ({request.exam_type}) - Entire Book ({request.total_marks} Marks)"
         
         student_content = ""
         answer_key = ""
