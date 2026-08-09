@@ -661,7 +661,7 @@ async def convert_to_google_form(paper_id: str, request: ConvertFormRequest):
                 "teacher_email": request.teacher_email,
                 "questions": questions_list
             }
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=25.0) as client:
                 resp = await client.post(request.apps_script_url.strip(), json=payload, follow_redirects=True)
                 if resp.status_code == 200:
                     try:
@@ -670,13 +670,32 @@ async def convert_to_google_form(paper_id: str, request: ConvertFormRequest):
                             form_url = res_data.get("form_url")
                             meta["google_form_id"] = res_data.get("form_id")
                         else:
-                            print(f"Apps Script returned failure status: {res_data.get('message')}. Using local fallback.")
-                    except Exception as json_err:
-                        print(f"Apps Script response is not valid JSON (HTML/Redirect page received): {json_err}. Using local fallback.")
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Google Apps Script Error: {res_data.get('message', 'Unknown failure message')}"
+                            )
+                    except ValueError:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Google Apps Script did not return valid JSON. Verify your script's deployment settings. Make sure 'Who has access' is set to 'Anyone'."
+                        )
                 else:
-                    print(f"Apps Script returned status code {resp.status_code}. Using local fallback.")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Google Apps Script returned HTTP status code {resp.status_code}."
+                    )
+        except httpx.HTTPError as net_err:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to communicate with Google Apps Script: {str(net_err)}"
+            )
         except Exception as e:
-            print(f"Apps Script Connection Failed: {e}. Using local fallback.")
+            if isinstance(e, HTTPException):
+                raise e
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unexpected error creating Google Form: {str(e)}"
+            )
             
     meta["google_form_url"] = form_url
     
@@ -799,6 +818,7 @@ async def get_form_responses(paper_id: str, apps_script_url: Optional[str] = Non
                 
                 # LLM evaluate answer using stored answer key as grading reference
                 q_marks = q.get("max_marks", 5)
+                model_answer = "Refer to Teacher Answer Key PDF."
                 if not matched_ans.strip():
                     score = 0
                     feedback = "No answer was submitted for this question."
@@ -823,7 +843,8 @@ Textbook RAG Reference Context: {textbook_ref or "Use general technical knowledg
 Provide your feedback in this exact JSON format:
 {{
   "score": 4.0, // Numeric value out of {q_marks} (between 0.0 and {q_marks})
-  "feedback": "Constructive, professional feedback explaining what key facts were correct, what elements were missing compared to the textbook, and any specific errors made."
+  "feedback": "Constructive, professional feedback explaining what key facts were correct, what elements were missing compared to the textbook, and any specific errors made.",
+  "model_answer": "The expected ideal answer to this question according to the teacher answer key and textbook context."
 }}
 Return only raw JSON.
 """
@@ -836,6 +857,7 @@ Return only raw JSON.
                         score = float(grade_data.get("score", 0))
                         score = max(0.0, min(score, float(q_marks)))
                         feedback = grade_data.get("feedback") or "Evaluated."
+                        model_answer = grade_data.get("model_answer") or "Refer to Teacher Answer Key PDF."
                     except Exception as grading_err:
                         print(f"Error grading answer: {grading_err}")
                         student_ans_clean = matched_ans.strip().lower()
@@ -874,7 +896,8 @@ Return only raw JSON.
                     "max_marks": q_marks,
                     "student_answer": matched_ans,
                     "score_obtained": score,
-                    "feedback": feedback
+                    "feedback": feedback,
+                    "model_answer": model_answer
                 })
                 
             total_score = round(total_score, 1)
@@ -1096,6 +1119,7 @@ async def submit_mock_form(paper_id: str, request: MockSubmissionRequest):
                 
         # LLM evaluate answer
         q_marks = q.get("max_marks", 5)
+        model_answer = "Refer to Teacher Answer Key PDF."
         if not matched_ans.strip():
             score = 0
             feedback = "No answer was submitted for this question."
@@ -1113,7 +1137,8 @@ async def submit_mock_form(paper_id: str, request: MockSubmissionRequest):
                 Provide your feedback in this exact JSON format:
                 {{
                   "score": 4.0, // Numeric value out of {q_marks}
-                  "feedback": "Concise feedback describing accuracy, mistakes, and missing elements"
+                  "feedback": "Concise feedback describing accuracy, mistakes, and missing elements",
+                  "model_answer": "The expected ideal answer to this question based on the textbook context."
                 }}
                 Return only raw JSON.
                 """
@@ -1126,6 +1151,7 @@ async def submit_mock_form(paper_id: str, request: MockSubmissionRequest):
                 score = float(grade_data.get("score", 0))
                 score = max(0.0, min(score, float(q_marks)))
                 feedback = grade_data.get("feedback") or "Evaluated."
+                model_answer = grade_data.get("model_answer") or "Refer to Teacher Answer Key PDF."
             except Exception as grading_err:
                 print(f"Error grading answer: {grading_err}")
                 score = round(float(q_marks) * 0.75, 1)
@@ -1139,7 +1165,8 @@ async def submit_mock_form(paper_id: str, request: MockSubmissionRequest):
             "max_marks": q_marks,
             "student_answer": matched_ans,
             "score_obtained": score,
-            "feedback": feedback
+            "feedback": feedback,
+            "model_answer": model_answer
         })
         
     overall_percentage = round((total_score / total_possible) * 100, 2) if total_possible > 0 else 0

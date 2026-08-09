@@ -375,14 +375,18 @@ export default function TeacherPanel({
     }
   };
 
+  const [fetchingError, setFetchingError] = useState<string | null>(null);
+
   const handleFetchResponses = async (paper: any) => {
     setSelectedPaper(paper);
     setLoadingResponses(true);
+    setFetchingError(null);
     try {
       const data = await api.getFormResponses(paper.id, appsScriptUrl);
       setFormResponses(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to fetch responses:", err);
+      setFetchingError(err.message || "Failed to retrieve student responses from Google Forms.");
     } finally {
       setLoadingResponses(false);
     }
@@ -402,9 +406,7 @@ export default function TeacherPanel({
   };
 
   useEffect(() => {
-    if (activeTab === "question-gen") {
-      fetchPapers();
-    }
+    fetchPapers();
   }, [activeTab]);
 
   const handleGeneratePaper = async () => {
@@ -2051,6 +2053,59 @@ export default function TeacherPanel({
                           )}
                         </div>
                       </div>
+                             {/* Active Google Form Integration Banner */}
+                      {selectedPaper.google_form_url && (
+                        <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                          <div className="space-y-1">
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Active Google Form Link</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${selectedPaper.google_form_url.includes("docs.google.com") ? "bg-emerald-500 animate-pulse" : "bg-indigo-500"}`}></span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-slate-350">
+                                {selectedPaper.google_form_url.includes("docs.google.com") ? "Connected to real Forms API" : "Connected to local mock flow"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono select-all block break-all">{selectedPaper.google_form_url}</span>
+                          </div>
+                          <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                            <a 
+                              href={selectedPaper.google_form_url.startsWith("http") ? selectedPaper.google_form_url : window.location.origin + selectedPaper.google_form_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex-1 sm:flex-none text-center px-3 py-1.5 bg-purple-650 hover:bg-purple-750 text-white font-extrabold rounded-lg text-[10px] transition-colors cursor-pointer shadow-sm shadow-purple-600/15"
+                            >
+                              Open Form
+                            </a>
+                            <button
+                              onClick={() => {
+                                const url = selectedPaper.google_form_url.startsWith("http") ? selectedPaper.google_form_url : window.location.origin + selectedPaper.google_form_url;
+                                navigator.clipboard.writeText(url);
+                                alert("Google Form link copied to clipboard!");
+                              }}
+                              className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 font-extrabold rounded-lg text-[10px] transition-colors cursor-pointer"
+                            >
+                              Copy Link
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error State Banner */}
+                      {fetchingError && (
+                        <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-xl text-xs space-y-2">
+                          <div className="flex items-center gap-2 text-red-800 dark:text-red-400 font-extrabold">
+                            <span>⚠ Response Retrieval Failed</span>
+                          </div>
+                          <p className="text-slate-650 dark:text-slate-350 leading-relaxed font-medium">
+                            {fetchingError}
+                          </p>
+                          <div className="text-[10px] text-slate-500 font-semibold space-y-1">
+                            <div>💡 <strong>How to fix this:</strong></div>
+                            <div>1. Ensure you have deployed the Apps Script Web App under your own Gmail.</div>
+                            <div>2. Make sure <strong>"Execute as"</strong> is set to <strong>"Me"</strong> and <strong>"Who has access"</strong> is set to <strong>"Anyone"</strong>.</div>
+                            <div>3. Verify the Form ID exists on your Google Drive.</div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Loading Responses State */}
                       {loadingResponses ? (
@@ -2075,24 +2130,12 @@ export default function TeacherPanel({
                         </div>
                       ) : (
                         <div className="space-y-5">
-                          {/* Aggregate stats summary widgets */}
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                              <span className="text-[9px] uppercase font-bold text-slate-400 block">Submissions</span>
-                              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 block">{formResponses.length} Responses</span>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                              <span className="text-[9px] uppercase font-bold text-slate-400 block">Class Average</span>
-                              <span className="text-sm font-extrabold text-emerald-600 mt-0.5 block">
-                                {(formResponses.reduce((acc, curr) => acc + curr.overall_percentage, 0) / formResponses.length).toFixed(1)} %
-                              </span>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                              <span className="text-[9px] uppercase font-bold text-slate-400 block">Evaluation Mode</span>
-                              <span className="text-xs font-extrabold text-indigo-600 mt-1 block flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> AI Semantic RAG
-                              </span>
-                            </div>
+                          {/* Submissions Stats */}
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Student Responses</h4>
+                            <span className="text-xs font-bold text-indigo-650 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400 px-2 py-0.5 rounded-full">
+                              {formResponses.length} submissions found
+                            </span>
                           </div>
 
                           {/* Student Submissions Table */}
@@ -2100,60 +2143,57 @@ export default function TeacherPanel({
                             <table className="w-full text-left text-xs border-collapse">
                               <thead>
                                 <tr className="bg-slate-100/50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800">
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] w-[120px]">Student Name</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] whitespace-nowrap w-[90px]">Submitted</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] w-[60px]">Score</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] w-[60px]">Percentage</th>
-                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right w-[110px]">Actions</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Student</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] whitespace-nowrap">Submitted</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Score</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px]">Status</th>
+                                  <th className="p-3 font-extrabold text-slate-500 uppercase text-[9px] text-right">Action</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                {formResponses.map((res) => (
-                                  <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td 
-                                      className="p-3 font-extrabold text-slate-700 dark:text-slate-300 max-w-[120px] truncate"
-                                      title={res.student_name}
-                                    >
-                                      {res.student_name}
-                                    </td>
-                                    <td className="p-3 text-slate-400 text-[10px] whitespace-nowrap">
-                                      {res.submission_time && res.submission_time.length > 16 ? res.submission_time.substring(5, 16) : res.submission_time}
-                                    </td>
-                                    <td className="p-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                                      {Number(res.marks_obtained).toFixed(1).replace(/\.0$/, "")} / {res.total_marks}
-                                    </td>
-                                    <td className="p-3 whitespace-nowrap">
-                                      <span className={`font-bold ${
-                                        res.overall_percentage >= 80 
-                                          ? "text-emerald-600" 
-                                          : res.overall_percentage >= 60 
-                                            ? "text-amber-600" 
-                                            : "text-red-500"
-                                      }`}>
-                                        {res.overall_percentage.toFixed(1)}%
-                                      </span>
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      <div className="flex justify-end gap-1.5 whitespace-nowrap">
-                                        <button
-                                          onClick={() => setViewingResponseDetail(res)}
-                                          className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
-                                        >
-                                          Analysis
-                                        </button>
+                                {formResponses.map((res) => {
+                                  const isEvaluated = res.marks_obtained !== undefined && res.marks_obtained !== null;
+                                  return (
+                                    <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                                      <td 
+                                        className="p-3 font-extrabold text-slate-700 dark:text-slate-300 max-w-[150px] truncate"
+                                        title={res.student_name}
+                                      >
+                                        {res.student_name}
+                                      </td>
+                                      <td className="p-3 text-slate-400 text-[10px] whitespace-nowrap">
+                                        {res.submission_time && res.submission_time.length > 16 ? res.submission_time.substring(5, 16) : res.submission_time}
+                                      </td>
+                                      <td className="p-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                        {isEvaluated ? `${Number(res.marks_obtained).toFixed(1).replace(/\.0$/, "")} / ${res.total_marks}` : "—"}
+                                      </td>
+                                      <td className="p-3 whitespace-nowrap">
+                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                          isEvaluated 
+                                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400" 
+                                            : "bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400"
+                                        }`}>
+                                          {isEvaluated ? "Evaluated" : "Pending"}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-right">
                                         <button
                                           onClick={() => {
-                                            setGradingResponseId(res.id);
-                                            setOverrideMarksVal(res.marks_obtained);
+                                            setViewingResponseDetail(res);
+                                            setOverrideMarksVal(res.marks_obtained || 0);
                                           }}
-                                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-650 font-bold rounded text-[10px] transition-colors cursor-pointer"
+                                          className={`px-3 py-1 font-extrabold rounded text-[10px] transition-colors cursor-pointer ${
+                                            isEvaluated
+                                              ? "bg-indigo-50 hover:bg-indigo-100 text-indigo-650 dark:bg-indigo-950/30 dark:text-indigo-400"
+                                              : "bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                                          }`}
                                         >
-                                          Override
+                                          {isEvaluated ? "View" : "Evaluate"}
                                         </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
@@ -2187,6 +2227,39 @@ export default function TeacherPanel({
                   </div>
                   
                   <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+                    {/* Inline Manual Override Banner */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-805 rounded-xl">
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-450 block tracking-wider">Final Marks Awarded</span>
+                        <div className="text-xs font-extrabold text-slate-800 dark:text-slate-205 mt-0.5">
+                          {viewingResponseDetail.marks_obtained} / {viewingResponseDetail.total_marks} ({viewingResponseDetail.overall_percentage.toFixed(1)}%)
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[9px] text-slate-450 font-bold uppercase whitespace-nowrap">Edit Score:</label>
+                        <input 
+                          type="number"
+                          value={overrideMarksVal}
+                          onChange={(e) => setOverrideMarksVal(Number(e.target.value))}
+                          className="w-14 p-1 text-center text-[11px] font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white"
+                        />
+                        <button
+                          onClick={async () => {
+                            await handleOverrideMarks(viewingResponseDetail.id, overrideMarksVal);
+                            alert("Marks updated successfully!");
+                            setViewingResponseDetail((prev: any) => ({
+                              ...prev,
+                              marks_obtained: overrideMarksVal,
+                              overall_percentage: (overrideMarksVal / prev.total_marks) * 100
+                            }));
+                          }}
+                          className="px-2.5 py-1 bg-indigo-650 hover:bg-indigo-750 text-white font-extrabold rounded-lg text-[9px] transition-colors cursor-pointer"
+                        >
+                          Save Override
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Overall AI Summary feedback block */}
                     <div className="p-3.5 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-xl">
                       <span className="font-bold text-purple-750 dark:text-purple-300 block mb-1 uppercase text-[9px] tracking-wider font-extrabold">Overall AI Evaluation Feedback</span>
@@ -2211,8 +2284,17 @@ export default function TeacherPanel({
                             </p>
                           </div>
 
-                          <div className="bg-emerald-50/40 dark:bg-emerald-950/10 p-2.5 rounded-lg border border-emerald-100/60 text-[10px] text-emerald-800 dark:text-emerald-455 leading-relaxed font-semibold">
-                            💡 <strong className="text-emerald-900 dark:text-emerald-400 font-extrabold">AI Analysis & Concepts Missed:</strong> {q.feedback}
+                          {q.model_answer && (
+                            <div>
+                              <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Correct / Model Answer</span>
+                              <p className="text-slate-700 dark:text-slate-350 bg-emerald-50/20 dark:bg-emerald-950/10 p-2.5 rounded-lg border border-emerald-100/30 dark:border-emerald-900/30 leading-relaxed font-semibold">
+                                {q.model_answer}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="bg-indigo-50/40 dark:bg-indigo-950/10 p-2.5 rounded-lg border border-indigo-100/60 text-[10px] text-indigo-800 dark:text-indigo-455 leading-relaxed font-semibold">
+                            💡 <strong className="text-indigo-900 dark:text-indigo-400 font-extrabold">AI Evaluation & Conceptual Reasoning:</strong> {q.feedback}
                           </div>
                         </div>
                       ))}

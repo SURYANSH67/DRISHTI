@@ -260,7 +260,10 @@ export const api = {
         teacher_email: sharingEmail
       })
     });
-    if (!res.ok) throw new Error("Failed to convert paper to Google Form");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || "Failed to convert paper to Google Form");
+    }
     return res.json();
   },
 
@@ -269,7 +272,10 @@ export const api = {
       ? `${API_BASE_URL}/generator/papers/${paperId}/responses?apps_script_url=${encodeURIComponent(appsScriptUrl)}` 
       : `${API_BASE_URL}/generator/papers/${paperId}/responses`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch student responses");
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || "Failed to fetch student responses");
+    }
     return res.json();
   },
 
